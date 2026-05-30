@@ -1,0 +1,174 @@
+@import './base.css';
+
+/* Dashboard Layout Structures */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  transition: var(--transition-smooth);
+}
+
+.workspace {
+  flex: 1;
+  padding: 1.75rem;
+  overflow-y: auto;
+  background-color: var(--color-bg-scaffold);
+}
+
+/* Card glassmorphism and shadow layouts */
+.dashboard-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-lg);
+  transition: var(--transition-smooth);
+}
+
+.dashboard-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 35px -3px rgba(91, 79, 220, 0.09);
+}
+
+/* Micro-animations */
+.animate-fade {
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Glassmorphism details */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Custom premium badge widgets */
+.badge-status {
+  padding: 0.25rem 0.6rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.badge-status.active {
+  background-color: #E8F8F0;
+  color: var(--color-primary-dark);
+  border: 1px solid rgba(91, 79, 220, 0.2);
+}
+
+.badge-status.inactive {
+  background-color: #F1F5F9;
+  color: var(--color-text-secondary);
+}
+
+/* PrimeVue Component Overrides for Quizlo design styling */
+.p-datatable {
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.p-datatable-header {
+  background: var(--color-bg-card) !important;
+  border-color: var(--color-divider) !important;
+}
+
+.p-datatable-thead > tr > th {
+  background: #F8FAFC !important;
+  color: var(--color-text-primary) !important;
+  font-weight: 600 !important;
+  font-size: 0.85rem !important;
+}
+
+.p-button {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: 0 4px 10px rgba(91, 79, 220, 0.15);
+  transition: var(--transition-smooth) !important;
+}
+
+.p-button:hover {
+  background-color: var(--color-primary-light) !important;
+  border-color: var(--color-primary-light) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(91, 79, 220, 0.25);
+}
+
+.p-button-secondary {
+  background-color: transparent !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: none !important;
+}
+
+.p-button-secondary:hover {
+  background-color: var(--color-bg-scaffold) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: none !important;
+}
+
+.p-dialog {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  overflow: hidden;
+}
+
+.p-dialog-header {
+  border-bottom: 1px solid var(--color-divider);
+  padding: 1.25rem 1.5rem !important;
+}
+
+.p-dialog-content {
+  padding: 1.5rem !important;
+}
+
+.p-inputtext {
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--color-border) !important;
+  padding: 0.6rem 0.85rem !important;
+  transition: var(--transition-smooth) !important;
+}
+
+.p-inputtext:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px var(--color-primary-surface) !important;
+}
+
+.p-dropdown {
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--color-border) !important;
+  transition: var(--transition-smooth) !important;
+}
+
+.p-dropdown:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px var(--color-primary-surface) !important;
+}
