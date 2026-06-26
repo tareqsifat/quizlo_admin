@@ -2,7 +2,7 @@ import axios from 'axios'
 import { mockDb } from './mockDb'
 
 // Base URL configuration for live backend integration
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.quizlo.app/api/v1'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1'
 
 const client = axios.create({
   baseURL: BASE_URL,
@@ -63,6 +63,41 @@ client.interceptors.request.use((config) => {
 
   // Route matching rules
   try {
+    // 0. Admin Login
+    if (url.match(/^\/?auth\/admin\/login$/)) {
+      if (data && data.email === 'admin@quizlo.app' && data.password === 'password') {
+        return resolveMock({
+          token: {
+            token_type: 'Bearer',
+            expires_in: 1296000,
+            access_token: 'mock_admin_access_token_12345',
+            refresh_token: 'mock_admin_refresh_token_12345'
+          },
+          user: {
+            id: 3,
+            name: 'Admin User',
+            email: 'admin@quizlo.app',
+            phone: '01900000003'
+          }
+        })
+      } else {
+        return delay(300).then(() => Promise.reject({
+          config,
+          response: {
+            status: 400,
+            statusText: 'Bad Request',
+            headers: {},
+            config,
+            data: {
+              success: false,
+              message: 'Invalid admin credentials or account not authorized.',
+              data: null
+            }
+          }
+        }))
+      }
+    }
+
     // 1. Dashboard Stats
     if (url.match(/^\/?admin\/dashboard\/stats/)) {
       return resolveMock(mockDb.getDashboardStats())

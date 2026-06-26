@@ -26,20 +26,26 @@
       </router-link>
     </nav>
 
-    <div class="sidebar-footer" v-if="!isCollapsed">
-      <div class="user-profile">
-        <div class="avatar">AD</div>
+    <div class="sidebar-footer">
+      <div class="user-profile" v-if="!isCollapsed">
+        <div class="avatar">{{ userInitials }}</div>
         <div class="user-info">
-          <div class="user-name">Techlead Admin</div>
-          <div class="user-role">System Admin</div>
+          <div class="user-name">{{ userName }}</div>
+          <div class="user-role">{{ userRole }}</div>
         </div>
       </div>
+      <button class="logout-btn" @click="handleLogout" :title="isCollapsed ? 'Log out' : ''">
+        <LogOut class="logout-icon" />
+        <span class="logout-label" v-if="!isCollapsed">Logout</span>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../modules/auth/store/authStore'
 import { 
   LayoutDashboard, 
   Layers, 
@@ -47,10 +53,33 @@ import {
   HelpCircle, 
   Users, 
   Calendar, 
-  Settings 
+  LogOut
 } from 'lucide-vue-next'
 
+const router = useRouter()
+const authStore = useAuthStore()
 const isCollapsed = ref(false)
+
+const userInitials = computed(() => {
+  const name = authStore.user?.name || 'Techlead Admin'
+  return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+})
+
+const userName = computed(() => {
+  return authStore.user?.name || 'Techlead Admin'
+})
+
+const userRole = computed(() => {
+  if (authStore.user) {
+    return authStore.user.is_admin ? 'System Admin' : 'User'
+  }
+  return 'System Admin'
+})
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/login')
+}
 
 const navItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -176,6 +205,45 @@ function toggleCollapse() {
 .sidebar-footer {
   padding: 1rem 1.25rem;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-collapsed .sidebar-footer {
+  padding: 1rem 0.5rem;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: var(--color-heart);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 600;
+  font-size: 0.925rem;
+  transition: var(--transition-smooth);
+}
+
+.logout-btn:hover {
+  background: rgba(231, 76, 60, 0.1);
+  color: #F87171;
+}
+
+.logout-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sidebar-collapsed .logout-btn {
+  justify-content: center;
+  padding: 0.75rem 0;
 }
 
 .user-profile {

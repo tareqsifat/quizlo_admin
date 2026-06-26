@@ -146,7 +146,7 @@
               <InputText v-model="opt.option_text" placeholder="Option text (English) *" class="flex-2" required="true" />
               <InputText v-model="opt.option_text_bn" placeholder="Option text (Bangla)" class="flex-2" />
               <div class="flex align-items-center gap-1">
-                <InputSwitch v-model="opt.is_correct" @change="ensureSingleCorrect(idx)" />
+                <ToggleSwitch v-model="opt.is_correct" @change="ensureSingleCorrect(idx)" />
                 <span class="text-xs">Correct</span>
               </div>
               <Button icon="pi pi-trash" class="p-button-danger p-button-text p-button-rounded" @click="removeOptionField(idx)" />
@@ -240,7 +240,7 @@ import Column from 'primevue/column'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
-import InputSwitch from 'primevue/inputswitch'
+import ToggleSwitch from 'primevue/toggleswitch'
 import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
 import apiClient from '../../../shared/services/apiClient'
