@@ -141,25 +141,29 @@
 
           <div class="options-list">
             <!-- MCQ & Fill in Gap & Listening options list -->
-            <div v-if="questionForm.question_type !== 'match_answer'" v-for="(opt, idx) in questionForm.options" :key="'opt-' + idx" class="option-item-row mb-2">
-              <span class="option-num">{{ idx + 1 }}</span>
-              <InputText v-model="opt.option_text" placeholder="Option text (English) *" class="flex-2" required="true" />
-              <InputText v-model="opt.option_text_bn" placeholder="Option text (Bangla)" class="flex-2" />
-              <div class="flex align-items-center gap-1">
-                <ToggleSwitch v-model="opt.is_correct" @change="ensureSingleCorrect(idx)" />
-                <span class="text-xs">Correct</span>
+            <template v-if="questionForm.question_type !== 'match_answer'">
+              <div v-for="(opt, idx) in questionForm.options" :key="'opt-' + idx" class="option-item-row mb-2">
+                <span class="option-num">{{ idx + 1 }}</span>
+                <InputText v-model="opt.option_text" placeholder="Option text (English) *" class="flex-2" required="true" />
+                <InputText v-model="opt.option_text_bn" placeholder="Option text (Bangla)" class="flex-2" />
+                <div class="correct-toggle-wrapper">
+                  <ToggleSwitch v-model="opt.is_correct" @change="ensureSingleCorrect(idx)" />
+                  <span class="correct-toggle-label">Correct</span>
+                </div>
+                <Button icon="pi pi-trash" class="p-button-danger p-button-text p-button-rounded" @click="removeOptionField(idx)" />
               </div>
-              <Button icon="pi pi-trash" class="p-button-danger p-button-text p-button-rounded" @click="removeOptionField(idx)" />
-            </div>
+            </template>
 
             <!-- Match Answer options list (Matching items) -->
-            <div v-else v-for="(opt, idx) in questionForm.options" :key="'match-' + idx" class="option-item-row match-row mb-2">
-              <span class="option-num">{{ idx + 1 }}</span>
-              <InputText v-model="opt.option_text" placeholder="Left Side Item (e.g. Six Point Demand) *" class="flex-3" required="true" />
-              <i class="pi pi-arrow-right match-arrow"></i>
-              <InputText v-model="opt.match_text" placeholder="Right Side Pair Match (e.g. 1966) *" class="flex-3" required="true" />
-              <Button icon="pi pi-trash" class="p-button-danger p-button-text p-button-rounded" @click="removeOptionField(idx)" />
-            </div>
+            <template v-else>
+              <div v-for="(opt, idx) in questionForm.options" :key="'match-' + idx" class="option-item-row match-row mb-2">
+                <span class="option-num">{{ idx + 1 }}</span>
+                <InputText v-model="opt.option_text" placeholder="Left Side Item (e.g. Six Point Demand) *" class="flex-3" required="true" />
+                <i class="pi pi-arrow-right match-arrow"></i>
+                <InputText v-model="opt.match_text" placeholder="Right Side Pair Match (e.g. 1966) *" class="flex-3" required="true" />
+                <Button icon="pi pi-trash" class="p-button-danger p-button-text p-button-rounded" @click="removeOptionField(idx)" />
+              </div>
+            </template>
           </div>
         </div>
 
@@ -646,6 +650,25 @@ async function runImport() {
   gap: 0.35rem;
 }
 
+/* Dialog Form & Grid Styles */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.field label {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
 .form-row {
   display: flex;
   gap: 1rem;
@@ -653,6 +676,14 @@ async function runImport() {
 
 .col-6 { flex: 1; }
 .col-4 { flex: 1; }
+
+/* Force PrimeVue components to stretch to 100% within fluid dialogs */
+.p-fluid .p-inputtext,
+.p-fluid .p-textarea,
+.p-fluid .p-dropdown,
+.p-fluid .p-inputnumber {
+  width: 100% !important;
+}
 
 .audio-section {
   background-color: var(--color-bg-scaffold);
@@ -686,26 +717,82 @@ async function runImport() {
 
 .options-header h5 {
   font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .option-item-row {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: center;
+  background: var(--color-bg-scaffold);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  transition: var(--transition-smooth);
+}
+
+.option-item-row:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-sm);
 }
 
 .option-num {
   font-weight: 700;
-  color: var(--color-text-hint);
-  width: 20px;
+  color: var(--color-primary);
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary-surface);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .flex-2 { flex: 2; }
 .flex-3 { flex: 3; }
 
+.correct-toggle-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.correct-toggle-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Match Row Specific Styles */
+.match-row {
+  background: #FEF9EC;
+  border-color: rgba(243, 156, 18, 0.2);
+}
+
+.match-row:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-accent-light);
+}
+
 .match-arrow {
-  color: var(--color-text-hint);
-  font-size: 0.95rem;
+  color: var(--color-accent-dark);
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .import-results-box {
