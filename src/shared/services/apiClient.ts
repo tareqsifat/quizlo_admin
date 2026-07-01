@@ -64,7 +64,7 @@ client.interceptors.request.use((config) => {
   // Route matching rules
   try {
     // 0. Admin Login
-    if (url.match(/^\/?auth\/admin\/login$/)) {
+    if (url.match(/^\/?auth\/admin-login$/)) {
       if (data && data.email === 'admin@quizlo.app' && data.password === 'password') {
         return resolveMock({
           token: {

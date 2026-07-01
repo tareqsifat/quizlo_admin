@@ -141,7 +141,7 @@ async function handleLogin() {
   errorMessage.value = null
 
   try {
-    const response = await apiClient.post('/auth/admin/login', {
+    const response = await apiClient.post('/auth/admin-login', {
       email: email.value,
       password: password.value
     })
