@@ -54,22 +54,6 @@
           </div>
         </div>
 
-        <!-- Dev Hint Box -->
-        <div class="hint-box">
-          <i class="pi pi-info-circle hint-icon"></i>
-          <div>
-            <span class="hint-title">Sandbox Credentials:</span>
-            <p v-if="isMockMode" class="hint-text">
-              Email: <code class="code-select">admin@quizlo.app</code><br />
-              Password: <code class="code-select">password</code>
-            </p>
-            <p v-else class="hint-text">
-              Email: <code class="code-select">admin@quizlo.com</code><br />
-              Password: <code class="code-select">password</code>
-            </p>
-          </div>
-          <button type="button" class="autofill-btn" @click="autofill" :disabled="loading">Autofill</button>
-        </div>
 
         <!-- Error Banner -->
         <transition name="slide-up">
