@@ -126,43 +126,96 @@ client.interceptors.request.use((config) => {
       return resolveMock(mockDb.removeSubject(parseInt(removeSubjectMatch[1]!), parseInt(removeSubjectMatch[2]!)))
     }
 
-    // 3. Subjects list
-    if (url.match(/^\/?admin\/subjects$/)) {
+    // 3. Subjects — full CRUD
+    if (url.match(/^\/?\.?admin\/subjects\/all$/)) {
       return resolveMock(mockDb.getSubjects())
+    }
+    if (url.match(/^\/?admin\/subjects$/)) {
+      if (method === 'get') {
+        return resolveMock(mockDb.getSubjects())
+      }
+      if (method === 'post') {
+        return resolveMock(mockDb.createSubject(data))
+      }
+    }
+    const subjectMatch = url.match(/^\/?admin\/subjects\/(\d+)$/)
+    if (subjectMatch) {
+      const subId = parseInt(subjectMatch[1]!)
+      if (method === 'put')    return resolveMock(mockDb.updateSubject(subId, data))
+      if (method === 'delete') return resolveMock(mockDb.deleteSubject(subId))
+    }
+
+    // 3b. Exam Type Subjects — full CRUD
+    const etsForExamTypeMatch = url.match(/^\/?admin\/exam-type-subjects\/for-exam-type\/(\d+)$/)
+    if (etsForExamTypeMatch && method === 'get') {
+      return resolveMock(mockDb.getExamTypeSubjectEntriesForExamType(parseInt(etsForExamTypeMatch[1]!)))
+    }
+    if (url.match(/^\/?admin\/exam-type-subjects$/)) {
+      if (method === 'get') {
+        return resolveMock(mockDb.getExamTypeSubjectEntries())
+      }
+      if (method === 'post') {
+        return resolveMock(mockDb.createExamTypeSubjectEntry(data))
+      }
+    }
+    const etsMatch = url.match(/^\/?admin\/exam-type-subjects\/(\d+)$/)
+    if (etsMatch) {
+      const etsId = parseInt(etsMatch[1]!)
+      if (method === 'put')    return resolveMock(mockDb.updateExamTypeSubjectEntry(etsId, data))
+      if (method === 'delete') return resolveMock(mockDb.deleteExamTypeSubjectEntry(etsId))
+    }
+
+    // 5. Questions import (updated: uses exam-type-subject matching)
+    if (url.match(/^\/?admin\/questions\/import/)) {
+      // Build exam-subject lookup map for this exam type
+      const etsMap: Record<string, number> = {}
+      const etsForType = mockDb.getExamTypeSubjectEntriesForExamType(data.exam_type_id)
+      etsForType.forEach((ets: any) => {
+        etsMap[ets.title.toLowerCase().trim()] = ets.id
+      })
+
+      let imported = 0, skipped = 0
+      const failed: any[] = []
+      const notices: any[] = []
+
+      ;(data.rows || []).forEach((row: any, idx: number) => {
+        const rowNum = idx + 1
+        if (!row.question) { skipped++; notices.push({ row: rowNum, reason: 'Missing question text' }); return }
+        if (!row.optionA || !row.optionB) { skipped++; notices.push({ row: rowNum, reason: 'Missing options B or C' }); return }
+        const subjectKey = (row.subject || '').toLowerCase().trim()
+        if (!subjectKey) { skipped++; notices.push({ row: rowNum, reason: 'Subject column (G) is empty.' }); return }
+        const etsId = etsMap[subjectKey]
+        if (!etsId) {
+          failed.push({ row: rowNum, subject_raw: row.subject, reason: `No Exam Subject found for "${row.subject}" under the selected Exam Type.` })
+          return
+        }
+        mockDb.createQuestion({ subject_id: etsId, question_text: row.question, question_type: 'mcq', explanation: row.explanation, difficulty: 'medium', xp_value: 10,
+          options: [
+            { option_text: row.optionA, is_correct: row.rightAnswer === 'A' },
+            { option_text: row.optionB, is_correct: row.rightAnswer === 'B' },
+            ...(row.optionC ? [{ option_text: row.optionC, is_correct: row.rightAnswer === 'C' }] : []),
+            ...(row.optionD ? [{ option_text: row.optionD, is_correct: row.rightAnswer === 'D' }] : []),
+          ] })
+        imported++
+      })
+      return resolveMock({ imported, skipped, failed, notices })
     }
 
     // 4. Lessons
     if (url.match(/^\/?admin\/lessons$/)) {
-      if (method === 'get') {
-        return resolveMock(mockDb.getLessons())
-      }
-      if (method === 'post') {
-        return resolveMock(mockDb.createLesson(data))
-      }
+      if (method === 'get') return resolveMock(mockDb.getLessons())
+      if (method === 'post') return resolveMock(mockDb.createLesson(data))
     }
     const lessonMatch = url.match(/^\/?admin\/lessons\/(\d+)$/)
     if (lessonMatch) {
-      if (method === 'put') {
-        return resolveMock(mockDb.updateLesson(parseInt(lessonMatch[1]!), data))
-      }
-      if (method === 'delete') {
-        return resolveMock(mockDb.deleteLesson(parseInt(lessonMatch[1]!)))
-      }
+      if (method === 'put')    return resolveMock(mockDb.updateLesson(parseInt(lessonMatch[1]!), data))
+      if (method === 'delete') return resolveMock(mockDb.deleteLesson(parseInt(lessonMatch[1]!)))
     }
 
-    // 5. Questions (Multi-Type and Importer)
+    // 5. Questions (get / post)
     if (url.match(/^\/?admin\/questions$/)) {
-      if (method === 'get') {
-        return resolveMock(mockDb.getQuestions())
-      }
-      if (method === 'post') {
-        return resolveMock(mockDb.createQuestion(data))
-      }
-    }
-    
-    if (url.match(/^\/?admin\/questions\/import/)) {
-      const res = mockDb.importQuestions(data.exam_type_id, data.source_batch, data.source_year, data.questions)
-      return resolveMock(res)
+      if (method === 'get')  return resolveMock(mockDb.getQuestions())
+      if (method === 'post') return resolveMock(mockDb.createQuestion(data))
     }
 
     const questionMatch = url.match(/^\/?admin\/questions\/(\d+)$/)

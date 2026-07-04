@@ -191,15 +191,23 @@
           <span class="legend-col col-d">D<br><small>Option C</small></span>
           <span class="legend-col col-e">E<br><small>Option D</small></span>
           <span class="legend-col col-f">F<br><small>Answer (A/B/C/D)</small></span>
-          <span class="legend-col col-g">G<br><small>Subject (optional)</small></span>
+          <span class="legend-col col-g">G<br><small>Subject Title</small></span>
           <span class="legend-col col-h">H<br><small>Explanation (optional)</small></span>
         </div>
       </div>
 
       <div class="form-row mb-3">
         <div class="field col-6">
-          <label>Target Exam Registry</label>
-          <Dropdown v-model="importForm.exam_type_id" :options="examTypes" optionValue="id" optionLabel="name" placeholder="Select Exam Type (optional)" showClear />
+          <label>Exam Type <span class="required-star">*</span></label>
+          <Dropdown
+            v-model="importForm.exam_type_id"
+            :options="examTypes"
+            optionValue="id"
+            optionLabel="name"
+            placeholder="Select Exam Type"
+            :class="{ 'p-invalid': importExamTypeError }"
+          />
+          <small class="p-error" v-if="importExamTypeError">Exam Type is required before importing.</small>
         </div>
         <div class="field col-3">
           <label>Source Batch</label>
@@ -257,7 +265,7 @@
         <label>Paste rows from Google Sheets</label>
         <Textarea v-model="importForm.tsv_payload" rows="10"
           placeholder="Select and copy rows from your Google Sheet (Ctrl+C), then paste here (Ctrl+V).&#10;The first row is treated as a header if column A equals 'question' or 'Question'." />
-        <small class="helper-text">Rows with missing question or options will be skipped. Subject &amp; explanation columns are optional.</small>
+        <small class="helper-text">Rows with missing question or options will be skipped. Col G subject title must match an Exam Subject under the selected Exam Type (case-insensitive).</small>
       </div>
 
       <!-- Client-side parse preview -->
@@ -273,6 +281,16 @@
         <div class="result-stats">
           <div class="stat-chip green"><i class="pi pi-check-circle"></i> {{ importResults.imported }} Imported</div>
           <div class="stat-chip red"><i class="pi pi-times-circle"></i> {{ importResults.skipped }} Skipped</div>
+          <div class="stat-chip orange" v-if="importResults.failed?.length"><i class="pi pi-exclamation-triangle"></i> {{ importResults.failed.length }} Failed (Unmatched Subject)</div>
+        </div>
+        <!-- Failed rows: unmatched Exam Subject -->
+        <div v-if="importResults.failed?.length" class="failed-log">
+          <div class="failed-title"><i class="pi pi-exclamation-triangle"></i> Unmatched Exam Subject Rows:</div>
+          <div v-for="(f, fIdx) in importResults.failed" :key="fIdx" class="failed-item">
+            <span class="failed-row-num">Row {{ f.row }}</span>
+            <span class="failed-raw">"{{ f.subject_raw }}"</span>
+            <span class="failed-reason">{{ f.reason }}</span>
+          </div>
         </div>
         <div v-if="importResults.notices?.length" class="notices-log">
           <div class="notices-title">Notices &amp; Warnings:</div>
@@ -359,6 +377,7 @@ const importResults = ref<any>(null)
 const importLoading = ref(false)
 const parsedPreviewCount = ref<number | null>(null)
 const clientSkipCount = ref(0)
+const importExamTypeError = ref(false)
 
 // File upload state
 const importMode = ref<'file' | 'paste'>('file')
@@ -551,6 +570,7 @@ function openImportDialog() {
   uploadedFileName.value = ''
   parsedFileRows.value = []
   isDragging.value = false
+  importExamTypeError.value = false
   importDialog.value = true
 }
 
@@ -795,6 +815,12 @@ function parseTsvPayload(tsv: string) {
 }
 
 async function runImport() {
+  // ── Guard: exam type is required ──────────────────────────────
+  importExamTypeError.value = !importForm.value.exam_type_id
+  if (!importForm.value.exam_type_id) {
+    return
+  }
+
   let rows: any[] = []
   let skipped = 0
 
@@ -1349,6 +1375,64 @@ async function runImport() {
 .drop-sub {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+/* Failed rows panel */
+.failed-log {
+  margin-top: 0.75rem;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: rgba(231, 76, 60, 0.06);
+}
+
+.failed-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #E74C3C;
+  margin-bottom: 0.5rem;
+}
+
+.failed-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid rgba(231, 76, 60, 0.12);
+  font-size: 0.8rem;
+}
+.failed-item:last-child { border-bottom: none; }
+
+.failed-row-num {
+  background: rgba(231,76,60,0.15);
+  color: #E74C3C;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.failed-raw {
+  color: var(--color-text-primary);
+  font-style: italic;
+  flex-shrink: 0;
+}
+
+.failed-reason {
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.stat-chip.orange {
+  background: rgba(243, 156, 18, 0.12);
+  color: #F39C12;
+  border: 1px solid rgba(243, 156, 18, 0.25);
+}
+
+.required-star {
+  color: #E74C3C;
+  margin-left: 2px;
 }
 </style>
 

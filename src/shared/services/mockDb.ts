@@ -49,6 +49,20 @@ export interface ExamTypeSubject {
   syllabus_note?: string
 }
 
+export interface ExamTypeSubjectEntry {
+  id: number
+  exam_type_id: number
+  exam_type_name: string
+  subject_id: number
+  subject_name: string
+  subject_name_bn: string
+  title: string
+  title_bn?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface ExamType {
   id: number
   name: string
@@ -145,6 +159,28 @@ const examTypeSubjects = ref<ExamTypeSubject[]>([
   { exam_type_id: 1, subject_id: 3, subject_name: 'Bangladesh Affairs', is_active: true, sort_order: 3, total_marks: 30, syllabus_note: 'History and general knowledge' },
   { exam_type_id: 2, subject_id: 1, subject_name: 'Bangla', is_active: true, sort_order: 1, total_marks: 100 },
   { exam_type_id: 2, subject_id: 2, subject_name: 'English Grammar', is_active: true, sort_order: 2, total_marks: 100 }
+])
+
+// Feature 2: Exam Type Subjects (exam-type-specific subject titles)
+const examTypeSubjectEntries = ref<ExamTypeSubjectEntry[]>([
+  {
+    id: 1, exam_type_id: 1, exam_type_name: 'BCS Preliminary',
+    subject_id: 1, subject_name: 'Bangla', subject_name_bn: 'বাংলা',
+    title: 'বাংলা ভাষা ও সাহিত্য', title_bn: 'বাংলা ভাষা ও সাহিত্য',
+    is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
+  {
+    id: 2, exam_type_id: 1, exam_type_name: 'BCS Preliminary',
+    subject_id: 2, subject_name: 'English Grammar', subject_name_bn: 'ইংরেজি ব্যাকরণ',
+    title: 'English', title_bn: 'ইংরেজি',
+    is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
+  {
+    id: 3, exam_type_id: 1, exam_type_name: 'BCS Preliminary',
+    subject_id: 3, subject_name: 'Bangladesh Affairs', subject_name_bn: 'বাংলাদেশ বিষয়াবলী',
+    title: 'বাংলাদেশ বিষয়াবলী', title_bn: 'বাংলাদেশ বিষয়াবলী',
+    is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
 ])
 
 const lessons = ref<Lesson[]>([
@@ -431,6 +467,122 @@ export const mockDb = {
   // ── Subjects ──
   getSubjects() {
     return [...subjects.value]
+  },
+  createSubject(data: any) {
+    const newId = Math.max(...subjects.value.map(s => s.id), 0) + 1
+    const slug = data.slug || data.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    // Check slug uniqueness
+    if (subjects.value.find(s => s.slug === slug)) {
+      throw { response: { status: 422, data: { errors: { slug: ['This slug is already taken.'] } } } }
+    }
+    const newS: Subject = {
+      id: newId,
+      name: data.name,
+      name_bn: data.name_bn,
+      slug,
+      icon: data.icon || undefined,
+      color_hex: data.color_hex || undefined,
+      is_active: data.is_active !== undefined ? data.is_active : true,
+    }
+    subjects.value.push(newS)
+    return newS
+  },
+  updateSubject(id: number, data: any) {
+    const index = subjects.value.findIndex(s => s.id === id)
+    if (index === -1) throw new Error('Not Found')
+    subjects.value[index] = { ...subjects.value[index], ...data }
+    return subjects.value[index]
+  },
+  deleteSubject(id: number) {
+    // Block if exam type subject entries reference it
+    const usageCount = examTypeSubjectEntries.value.filter(e => e.subject_id === id).length
+    if (usageCount > 0) {
+      throw {
+        response: {
+          status: 422,
+          data: {
+            message: `Cannot delete: subject is used by ${usageCount} Exam Subject mapping(s). Remove those first, or deactivate the subject instead.`
+          }
+        }
+      }
+    }
+    const index = subjects.value.findIndex(s => s.id === id)
+    if (index !== -1) subjects.value.splice(index, 1)
+    return true
+  },
+
+  // ── Exam Type Subject Entries (Feature 2) ──
+  getExamTypeSubjectEntries(examTypeId?: number) {
+    if (examTypeId) {
+      return examTypeSubjectEntries.value.filter(e => e.exam_type_id === examTypeId)
+    }
+    return [...examTypeSubjectEntries.value]
+  },
+  getExamTypeSubjectEntriesForExamType(examTypeId: number) {
+    return examTypeSubjectEntries.value
+      .filter(e => e.exam_type_id === examTypeId && e.is_active)
+      .map(e => ({
+        id: e.id,
+        title: e.title,
+        title_bn: e.title_bn,
+        subject_id: e.subject_id,
+        subject_name: e.subject_name,
+        subject_name_bn: e.subject_name_bn,
+      }))
+  },
+  createExamTypeSubjectEntry(data: any) {
+    const examTypeId = data.exam_type_id
+    const subjectId  = data.subject_id
+    const title      = data.title?.trim()
+
+    // Uniqueness: (exam_type_id, subject_id)
+    if (examTypeSubjectEntries.value.find(e => e.exam_type_id === examTypeId && e.subject_id === subjectId)) {
+      throw { response: { status: 422, data: { errors: { subject_id: ['This subject is already mapped under the selected Exam Type.'] } } } }
+    }
+    // Uniqueness: (exam_type_id, title)
+    if (examTypeSubjectEntries.value.find(e => e.exam_type_id === examTypeId && e.title.toLowerCase() === title.toLowerCase())) {
+      throw { response: { status: 422, data: { errors: { title: [`Another Exam Subject already uses the title "${title}" under this Exam Type.`] } } } }
+    }
+
+    const et  = examTypes.value.find(e => e.id === examTypeId)
+    const sub = subjects.value.find(s => s.id === subjectId)
+    const newId = Math.max(...examTypeSubjectEntries.value.map(e => e.id), 0) + 1
+    const newEntry: ExamTypeSubjectEntry = {
+      id: newId,
+      exam_type_id: examTypeId, exam_type_name: et?.name ?? 'Unknown',
+      subject_id: subjectId, subject_name: sub?.name ?? 'Unknown', subject_name_bn: sub?.name_bn ?? '',
+      title, title_bn: data.title_bn ?? undefined,
+      is_active: data.is_active !== undefined ? data.is_active : true,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }
+    examTypeSubjectEntries.value.push(newEntry)
+    return newEntry
+  },
+  updateExamTypeSubjectEntry(id: number, data: any) {
+    const index = examTypeSubjectEntries.value.findIndex(e => e.id === id)
+    if (index === -1) throw new Error('Not Found')
+    const current = examTypeSubjectEntries.value[index]!
+    const examTypeId = data.exam_type_id ?? current.exam_type_id
+    const subjectId  = data.subject_id  ?? current.subject_id
+    const title      = data.title       ?? current.title
+
+    if (examTypeSubjectEntries.value.find(e => e.id !== id && e.exam_type_id === examTypeId && e.subject_id === subjectId)) {
+      throw { response: { status: 422, data: { errors: { subject_id: ['This subject is already mapped under the selected Exam Type.'] } } } }
+    }
+    if (examTypeSubjectEntries.value.find(e => e.id !== id && e.exam_type_id === examTypeId && e.title.toLowerCase() === title.toLowerCase())) {
+      throw { response: { status: 422, data: { errors: { title: [`Another Exam Subject already uses the title "${title}" under this Exam Type.`] } } } }
+    }
+
+    examTypeSubjectEntries.value[index] = { ...current, ...data, updated_at: new Date().toISOString() }
+    return examTypeSubjectEntries.value[index]
+  },
+  deleteExamTypeSubjectEntry(id: number) {
+    const entry = examTypeSubjectEntries.value.find(e => e.id === id)
+    if (!entry) throw new Error('Not Found')
+    // Block if questions reference it (mock: always 0 questions in mock)
+    const index = examTypeSubjectEntries.value.findIndex(e => e.id === id)
+    examTypeSubjectEntries.value.splice(index, 1)
+    return true
   },
 
   // ── Lessons ──

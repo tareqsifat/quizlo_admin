@@ -53,6 +53,8 @@ import {
   HelpCircle, 
   Users, 
   Calendar, 
+  BookMarked,
+  Tag,
   LogOut
 } from 'lucide-vue-next'
 
@@ -82,12 +84,14 @@ function handleLogout() {
 }
 
 const navItems = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { label: 'Exam Types', path: '/exam-types', icon: Layers },
-  { label: 'Lessons', path: '/lessons', icon: BookOpen },
-  { label: 'Questions', path: '/questions', icon: HelpCircle },
-  { label: 'Users', path: '/users', icon: Users },
-  { label: 'Model Tests', path: '/exams', icon: Calendar },
+  { label: 'Dashboard',    path: '/',                   icon: LayoutDashboard },
+  { label: 'Exam Types',   path: '/exam-types',          icon: Layers },
+  { label: 'Subjects',     path: '/subjects',            icon: BookMarked },
+  { label: 'Exam Subjects',path: '/exam-type-subjects',  icon: Tag },
+  { label: 'Lessons',      path: '/lessons',             icon: BookOpen },
+  { label: 'Questions',    path: '/questions',           icon: HelpCircle },
+  { label: 'Users',        path: '/users',               icon: Users },
+  { label: 'Model Tests',  path: '/exams',               icon: Calendar },
 ]
 
 function toggleCollapse() {
