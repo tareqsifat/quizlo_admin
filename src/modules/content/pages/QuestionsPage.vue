@@ -589,23 +589,32 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
  *   CSV  → No binary signature; must be printable ASCII/UTF-8 (first byte < 0x80 or BOM)
  */
 function detectFileSignature(bytes: Uint8Array): 'xlsx' | 'xls' | 'csv' | 'unknown' {
+  const b0 = bytes[0] ?? 0
+  const b1 = bytes[1] ?? 0
+  const b2 = bytes[2] ?? 0
+  const b3 = bytes[3] ?? 0
+  const b4 = bytes[4] ?? 0
+  const b5 = bytes[5] ?? 0
+  const b6 = bytes[6] ?? 0
+  const b7 = bytes[7] ?? 0
+
   // XLSX: PK ZIP (50 4B 03 04)
-  if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) {
+  if (b0 === 0x50 && b1 === 0x4B && b2 === 0x03 && b3 === 0x04) {
     return 'xlsx'
   }
   // XLS: OLE2 (D0 CF 11 E0 A1 B1 1A E1)
   if (
-    bytes[0] === 0xD0 && bytes[1] === 0xCF && bytes[2] === 0x11 && bytes[3] === 0xE0 &&
-    bytes[4] === 0xA1 && bytes[5] === 0xB1 && bytes[6] === 0x1A && bytes[7] === 0xE1
+    b0 === 0xD0 && b1 === 0xCF && b2 === 0x11 && b3 === 0xE0 &&
+    b4 === 0xA1 && b5 === 0xB1 && b6 === 0x1A && b7 === 0xE1
   ) {
     return 'xls'
   }
   // UTF-8 BOM (EF BB BF) → likely CSV/text
-  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+  if (b0 === 0xEF && b1 === 0xBB && b2 === 0xBF) {
     return 'csv'
   }
   // Printable ASCII start → treat as CSV candidate (will fail later if it is not)
-  if (bytes[0] >= 0x20 && bytes[0] < 0x80) {
+  if (b0 >= 0x20 && b0 < 0x80) {
     return 'csv'
   }
   return 'unknown'
@@ -705,15 +714,15 @@ async function processFile(file: File) {
     try {
       const data = new Uint8Array(e.target!.result as ArrayBuffer)
       const workbook = XLSX.read(data, { type: 'array' })
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const sheet = workbook.Sheets[workbook.SheetNames[0]!]!
       // Convert to 2D array (raw values, header row included)
-      const rawRows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+      const rawRows: (any[] | undefined)[] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
       const rows: any[] = []
       let skipped = 0
 
       for (let i = 1; i < rawRows.length; i++) {  // i=1 → skip header row
-        const cols = rawRows[i]
+        const cols: any[] = rawRows[i] ?? []
         const question    = String(cols[0] ?? '').trim()
         const optionA     = String(cols[1] ?? '').trim()
         const optionB     = String(cols[2] ?? '').trim()
@@ -755,10 +764,10 @@ function parseTsvPayload(tsv: string) {
   let skipped = 0
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+    const line: string = lines[i] ?? ''
     if (!line.trim()) continue
 
-    const cols = line.split('\t')
+    const cols: string[] = line.split('\t')
     const question   = (cols[0] ?? '').trim()
     const optionA    = (cols[1] ?? '').trim()
     const optionB    = (cols[2] ?? '').trim()
