@@ -39,10 +39,16 @@
           </span>
         </template>
       </Column>
+      <Column header="Actions" style="width: 110px">
+        <template #body="slotProps">
+          <Button icon="pi pi-pencil" class="p-button-text p-button-rounded" @click="openEditDialog(slotProps.data)" />
+          <Button icon="pi pi-trash" class="p-button-text p-button-rounded p-button-danger" @click="deleteExam(slotProps.data.id)" />
+        </template>
+      </Column>
     </DataTable>
 
-    <!-- Dialog for creating mock model tests -->
-    <Dialog v-model:visible="examDialog" header="Schedule New Model Test" :modal="true" style="width: 500px" class="p-fluid">
+    <!-- Dialog for creating/editing model tests -->
+    <Dialog v-model:visible="examDialog" :header="dialogHeader" :modal="true" style="width: 500px" class="p-fluid">
       <div class="field mb-3">
         <label>Exam English Title *</label>
         <InputText v-model="examForm.title" required="true" />
@@ -93,6 +99,8 @@ import apiClient from '../../../shared/services/apiClient'
 const exams = ref<any[]>([])
 const examTypes = ref<any[]>([])
 const examDialog = ref(false)
+const dialogHeader = ref('Schedule New Model Test')
+const editingId = ref<number | null>(null)
 
 const examForm = ref({
   title: '',
@@ -105,17 +113,15 @@ const examForm = ref({
 
 async function loadExams() {
   try {
-    // Simulated load from local list
     const etRes = await apiClient.get('/admin/exam-types')
     if (etRes.success) {
       examTypes.value = etRes.data
     }
 
-    // Default static mock model tests
-    exams.value = [
-      { id: 1, title: '45th BCS Preliminary Mock Test', title_bn: '৪৫তম বিসিএস প্রিলিমিনারি মক টেস্ট', exam_type_id: 1, exam_type_name: 'BCS Preliminary', total_questions: 100, duration_minutes: 60, xp_reward: 150, is_active: true },
-      { id: 2, title: 'HSC Bangla First Paper Mock', title_bn: 'এইচএসসি বাংলা ১ম পত্র মক', exam_type_id: 2, exam_type_name: 'HSC Examination', total_questions: 50, duration_minutes: 30, xp_reward: 80, is_active: true }
-    ]
+    const mtRes = await apiClient.get('/admin/model-tests')
+    if (mtRes.success) {
+      exams.value = mtRes.data
+    }
   } catch (error) {
     console.error('Error fetching exams:', error)
   }
@@ -126,6 +132,8 @@ onMounted(() => {
 })
 
 function openNewDialog() {
+  editingId.value = null
+  dialogHeader.value = 'Schedule New Model Test'
   examForm.value = {
     title: '',
     title_bn: '',
@@ -137,22 +145,52 @@ function openNewDialog() {
   examDialog.value = true
 }
 
-function saveExam() {
+function openEditDialog(exam: any) {
+  editingId.value = exam.id
+  dialogHeader.value = 'Edit Model Test'
+  examForm.value = {
+    title: exam.title,
+    title_bn: exam.title_bn,
+    exam_type_id: exam.exam_type_id,
+    total_questions: exam.total_questions,
+    duration_minutes: exam.duration_minutes,
+    xp_reward: exam.xp_reward
+  }
+  examDialog.value = true
+}
+
+async function saveExam() {
   if (!examForm.value.title || !examForm.value.exam_type_id) return
-  const matchEt = examTypes.value.find(e => e.id === examForm.value.exam_type_id)
-  
-  exams.value.push({
-    id: Math.max(...exams.value.map(e => e.id), 0) + 1,
-    title: examForm.value.title,
-    title_bn: examForm.value.title_bn,
-    exam_type_id: examForm.value.exam_type_id,
-    exam_type_name: matchEt ? matchEt.name : 'Unknown',
-    total_questions: examForm.value.total_questions,
-    duration_minutes: examForm.value.duration_minutes,
-    xp_reward: examForm.value.xp_reward,
-    is_active: true
-  })
-  examDialog.value = false
+  try {
+    if (editingId.value) {
+      const res = await apiClient.put(`/admin/model-tests/${editingId.value}`, examForm.value)
+      if (res.success) {
+        const idx = exams.value.findIndex(e => e.id === editingId.value)
+        if (idx !== -1) exams.value[idx] = res.data
+      }
+    } else {
+      const res = await apiClient.post('/admin/model-tests', examForm.value)
+      if (res.success) {
+        exams.value.push(res.data)
+      }
+    }
+    examDialog.value = false
+  } catch (error) {
+    console.error('Error saving model test:', error)
+  }
+}
+
+async function deleteExam(id: number) {
+  if (!confirm('Delete this model test? This cannot be undone.')) return
+  try {
+    const res = await apiClient.delete(`/admin/model-tests/${id}`)
+    if (res.success) {
+      exams.value = exams.value.filter(e => e.id !== id)
+    }
+  } catch (error: any) {
+    const msg = error?.response?.data?.message || 'Delete failed.'
+    alert(msg)
+  }
 }
 </script>
 

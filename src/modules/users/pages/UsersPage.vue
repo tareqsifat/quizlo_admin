@@ -97,7 +97,7 @@ async function toggleUserStatus(id: number) {
     const res = await apiClient.patch(`/admin/users/${id}/toggle-active`)
     if (res.success) {
       const idx = users.value.findIndex(u => u.id === id)
-      users.value[idx] = res.data
+      if (idx !== -1) users.value[idx] = { ...users.value[idx], ...res.data }
     }
   } catch (error) {
     console.error('Error toggling user status:', error)

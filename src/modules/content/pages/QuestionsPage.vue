@@ -12,8 +12,8 @@
     <div class="dashboard-card filter-card mb-3">
       <div class="filter-row">
         <div class="filter-item">
-          <label>Subject</label>
-          <Dropdown v-model="filters.subject_id" :options="subjects" optionValue="id" optionLabel="name" placeholder="All Subjects" showClear class="dropdown-w" />
+          <label>Exam Subject</label>
+          <Dropdown v-model="filters.exam_type_subject_id" :options="examTypeSubjects" optionValue="id" optionLabel="title" placeholder="All Exam Subjects" showClear class="dropdown-w" />
         </div>
         <div class="filter-item">
           <label>Question Type</label>
@@ -98,8 +98,8 @@
 
         <div class="form-row mb-3">
           <div class="field col-6">
-            <label>Subject *</label>
-            <Dropdown v-model="questionForm.subject_id" :options="subjects" optionValue="id" optionLabel="name" placeholder="Select Subject" required="true" :class="{'p-invalid': submitted && !questionForm.subject_id}" />
+            <label>Exam Subject *</label>
+            <Dropdown v-model="questionForm.exam_type_subject_id" :options="examTypeSubjects" optionValue="id" optionLabel="title" placeholder="Select Exam Subject" required="true" :class="{'p-invalid': submitted && !questionForm.exam_type_subject_id}" />
           </div>
           <div class="field col-6">
             <label>Associated Lesson</label>
@@ -328,7 +328,7 @@ import apiClient from '../../../shared/services/apiClient'
 // State
 const questions = ref<any[]>([])
 const examTypes = ref<any[]>([])
-const subjects = ref<any[]>([])
+const examTypeSubjects = ref<any[]>([])
 const lessons = ref<any[]>([])
 
 const questionDialog = ref(false)
@@ -346,7 +346,7 @@ const typeOptions = [
 ]
 
 const filters = ref({
-  subject_id: null as number | null,
+  exam_type_subject_id: null as number | null,
   question_type: null as string | null,
   difficulty: null as string | null,
   search: ''
@@ -354,7 +354,7 @@ const filters = ref({
 
 const questionForm = ref({
   id: null as number | null,
-  subject_id: null as number | null,
+  exam_type_subject_id: null as number | null,
   lesson_id: null as number | null,
   question_type: 'mcq' as 'mcq' | 'fill_gap' | 'listen_answer' | 'match_answer',
   question_text: '',
@@ -398,9 +398,9 @@ async function loadData() {
       examTypes.value = etRes.data
     }
 
-    const subRes = await apiClient.get('/admin/subjects')
-    if (subRes.success) {
-      subjects.value = subRes.data
+    const etsRes = await apiClient.get('/admin/exam-type-subjects')
+    if (etsRes.success) {
+      examTypeSubjects.value = etsRes.data
     }
 
     const lesRes = await apiClient.get('/admin/lessons')
@@ -423,7 +423,7 @@ onUnmounted(() => {
 
 const filteredQuestions = computed(() => {
   return questions.value.filter(q => {
-    if (filters.value.subject_id && q.subject_id !== filters.value.subject_id) return false
+    if (filters.value.exam_type_subject_id && q.exam_type_subject_id !== filters.value.exam_type_subject_id) return false
     if (filters.value.question_type && q.question_type !== filters.value.question_type) return false
     if (filters.value.difficulty && q.difficulty !== filters.value.difficulty) return false
     if (filters.value.search) {
@@ -452,7 +452,7 @@ function playAudio(url?: string) {
 function openNewDialog() {
   questionForm.value = {
     id: null,
-    subject_id: null,
+    exam_type_subject_id: null,
     lesson_id: null,
     question_type: 'mcq',
     question_text: '',
@@ -507,7 +507,7 @@ function ensureSingleCorrect(selectedIdx: number) {
 async function saveQuestion() {
   submitted.value = true
 
-  if (!questionForm.value.question_text || !questionForm.value.subject_id) {
+  if (!questionForm.value.question_text || !questionForm.value.exam_type_subject_id) {
     return
   }
 
@@ -542,15 +542,14 @@ async function saveQuestion() {
 }
 
 async function deleteQuestion(id: number) {
-  if (!confirm('Are you sure you want to deactivate/soft-delete this question?')) return
+  if (!confirm('Delete this question? This cannot be undone.')) return
   try {
     const res = await apiClient.delete(`/admin/questions/${id}`)
     if (res.success) {
-      const idx = questions.value.findIndex(q => q.id === id)
-      questions.value[idx].is_active = false
+      questions.value = questions.value.filter(q => q.id !== id)
     }
   } catch (error) {
-    console.error('Error deactivating question:', error)
+    console.error('Error deleting question:', error)
   }
 }
 
