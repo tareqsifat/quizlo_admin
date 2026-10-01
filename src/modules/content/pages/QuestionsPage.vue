@@ -8,12 +8,35 @@
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="dashboard-card filter-card mb-3">
-      <div class="filter-row">
+    <!-- Filter toolbar: search + filter drawer toggle + active filter tags -->
+    <div class="dashboard-card filter-toolbar mb-3">
+      <div class="toolbar-row">
+        <span class="p-input-icon-left search-wrap">
+          <InputText v-model="filters.search" placeholder="Search questions..." class="search-input" />
+        </span>
+        <Button icon="pi pi-filter" :label="activeFilterCount ? `Filters (${activeFilterCount})` : 'Filters'"
+                class="p-button-outlined" @click="filterDrawer = true" />
+        <span class="result-count">{{ pagination.total.toLocaleString() }} questions</span>
+      </div>
+      <div v-if="activeFilterTags.length" class="filter-tags">
+        <Chip v-for="tag in activeFilterTags" :key="tag.key" :label="tag.label" removable @remove="clearFilter(tag.key)" />
+        <Button label="Clear all" class="p-button-text p-button-sm" @click="clearAllFilters" />
+      </div>
+    </div>
+
+    <Drawer v-model:visible="filterDrawer" header="Filter Questions" position="right" class="filter-drawer">
+      <div class="drawer-filters">
+        <div class="filter-item">
+          <label>Exam Type</label>
+          <Dropdown v-model="filters.exam_type_id" :options="examTypes" optionValue="id" optionLabel="name" placeholder="All Exam Types" showClear class="dropdown-w" @change="onExamTypeFilterChange" />
+        </div>
         <div class="filter-item">
           <label>Exam Subject</label>
-          <Dropdown v-model="filters.exam_type_subject_id" :options="examTypeSubjects" optionValue="id" optionLabel="title" placeholder="All Exam Subjects" showClear class="dropdown-w" />
+          <Dropdown v-model="filters.exam_type_subject_id" :options="subjectsForFilter" optionValue="id" optionLabel="title" placeholder="All Exam Subjects" showClear class="dropdown-w" @change="filters.topic_id = null" />
+        </div>
+        <div class="filter-item">
+          <label>Topic</label>
+          <Dropdown v-model="filters.topic_id" :options="topicsForFilter" optionValue="id" optionLabel="name" placeholder="All Topics" showClear class="dropdown-w" />
         </div>
         <div class="filter-item">
           <label>Question Type</label>
@@ -23,17 +46,27 @@
           <label>Difficulty</label>
           <Dropdown v-model="filters.difficulty" :options="['easy', 'medium', 'hard']" placeholder="All Levels" showClear class="dropdown-w" />
         </div>
-        <div class="filter-item search-item">
-          <label>Search Text</label>
-          <InputText v-model="filters.search" placeholder="Search questions..." class="search-input" />
+        <div class="filter-item">
+          <label>Exam Year</label>
+          <Dropdown v-model="filters.year" :options="yearOptions" optionValue="value" optionLabel="label" placeholder="All Years" showClear filter class="dropdown-w" />
+        </div>
+        <div class="filter-item">
+          <label>AI Verified</label>
+          <Dropdown v-model="filters.verified_by_ai" :options="verifiedOptions" optionValue="value" optionLabel="label" placeholder="All" showClear class="dropdown-w" />
+        </div>
+        <div class="drawer-actions">
+          <Button label="Clear all" class="p-button-text" @click="clearAllFilters" />
+          <Button label="Done" @click="filterDrawer = false" />
         </div>
       </div>
-    </div>
+    </Drawer>
 
     <!-- Questions DataTable -->
-    <DataTable :value="filteredQuestions" dataKey="id" class="p-datatable-sm" paginator :rows="10" responsiveLayout="scroll">
-      <Column field="id" header="ID" style="width: 70px" :sortable="true"></Column>
-      <Column field="question_text" header="Question Text" :sortable="true">
+    <DataTable :value="questions" dataKey="id" class="p-datatable-sm" responsiveLayout="scroll"
+               lazy paginator :first="pagination.first" :rows="pagination.rows" :totalRecords="pagination.total"
+               :rowsPerPageOptions="[25, 50, 100]" :loading="questionsLoading" @page="onPage">
+      <Column field="id" header="ID" style="width: 70px"></Column>
+      <Column field="question_text" header="Question Text">
         <template #body="slotProps">
           <div class="question-texts">
             <span class="en-text">{{ slotProps.data.question_text }}</span>
@@ -41,35 +74,26 @@
           </div>
         </template>
       </Column>
-      <Column field="subject_name" header="Subject" :sortable="true" style="width: 140px"></Column>
-      <Column field="question_type" header="Type" style="width: 130px" :sortable="true">
+      <Column field="subject_name" header="Subject" style="width: 140px"></Column>
+      <Column header="Topic" style="width: 140px">
         <template #body="slotProps">
-          <span :class="['type-pill', slotProps.data.question_type]">
-            {{ getTypeName(slotProps.data.question_type) }}
-          </span>
+          {{ topicName(slotProps.data.topic_id) || '—' }}
         </template>
       </Column>
-      <Column header="Details" style="width: 150px">
+      <Column header="Years" style="width: 120px">
         <template #body="slotProps">
-          <div class="details-col">
-            <span v-if="slotProps.data.question_type === 'listen_answer'" class="audio-indicator">
-              <i class="pi pi-volume-up"></i> Has Audio
-              <Button icon="pi pi-play" class="p-button-rounded p-button-text p-button-xs" @click="playAudio(slotProps.data.audio_url)" />
-            </span>
-            <span v-else-if="slotProps.data.question_type === 'match_answer'">
-              <i class="pi pi-clone"></i> {{ slotProps.data.options?.length }} Pairs
-            </span>
-            <span v-else>
-              <i class="pi pi-list"></i> {{ slotProps.data.options?.length }} Options
-            </span>
+          <span v-if="questionYears(slotProps.data).length" class="years-text">{{ questionYears(slotProps.data).join(', ') }}</span>
+          <span v-else class="no-year">—</span>
+          <i v-if="slotProps.data.verified_by_ai" class="pi pi-verified verified-icon" title="Verified by AI"></i>
+        </template>
+      </Column>
+      <Column header="Review" style="width: 130px">
+        <template #body="slotProps">
+          <div class="review-col">
+            <span v-if="slotProps.data.checked_by_human" class="review-badge checked"><i class="pi pi-check"></i> Checked by human</span>
+            <span v-if="slotProps.data.rejection_reason" class="review-badge rejected" :title="slotProps.data.rejection_reason"><i class="pi pi-times"></i> Rejected</span>
+            <span v-if="!slotProps.data.checked_by_human && !slotProps.data.rejection_reason" class="no-year">—</span>
           </div>
-        </template>
-      </Column>
-      <Column header="Difficulty" style="width: 100px" :sortable="true">
-        <template #body="slotProps">
-          <span :class="['diff-badge', slotProps.data.difficulty]">
-            {{ slotProps.data.difficulty }}
-          </span>
         </template>
       </Column>
       <Column header="Actions" style="width: 130px">
@@ -89,6 +113,40 @@
           <label>Question Text (English) *</label>
           <Textarea v-model="questionForm.question_text" rows="2" required="true" :class="{'p-invalid': submitted && !questionForm.question_text}" />
           <small class="p-error" v-if="submitted && !questionForm.question_text">English question text is required.</small>
+          <Button
+            label="Search Similar Questions"
+            icon="pi pi-search"
+            class="p-button-outlined p-button-sm search-similar-btn"
+            :disabled="(questionForm.question_text || '').trim().length < 3"
+            @click="openSearchSimilarDialog"
+          />
+        </div>
+
+        <!-- Exam Appearance (which exam + year this question belongs to) -->
+        <div class="form-row mb-3">
+          <div class="field col-4">
+            <label>Exam Type (appearance)</label>
+            <Dropdown v-model="appearanceForm.exam_type_id" :options="examTypes" optionValue="id" optionLabel="name" placeholder="Optional" showClear />
+          </div>
+          <div class="field col-4">
+            <label>Source Batch</label>
+            <InputText v-model="appearanceForm.source_batch" placeholder="e.g. BCS-60" />
+          </div>
+          <div class="field col-4">
+            <label>Year</label>
+            <InputNumber v-model="appearanceForm.year" placeholder="2024" :useGrouping="false" />
+          </div>
+        </div>
+
+        <!-- Existing appearances (edit mode only) -->
+        <div class="field mb-3" v-if="questionForm.id && existingAppearances.length">
+          <label>Recorded Appearances</label>
+          <div class="appearance-chips">
+            <span class="appearance-chip" v-for="a in existingAppearances" :key="a.id">
+              {{ a.source_batch || (a.exam_type_code + ' ' + (a.year ?? '')) }}
+              <i class="pi pi-times" @click="removeAppearance(a.id)"></i>
+            </span>
+          </div>
         </div>
 
         <div class="field mb-3">
@@ -99,11 +157,18 @@
         <div class="form-row mb-3">
           <div class="field col-6">
             <label>Exam Subject *</label>
-            <Dropdown v-model="questionForm.exam_type_subject_id" :options="examTypeSubjects" optionValue="id" optionLabel="title" placeholder="Select Exam Subject" required="true" :class="{'p-invalid': submitted && !questionForm.exam_type_subject_id}" />
+            <Dropdown v-model="questionForm.exam_type_subject_id" :options="examTypeSubjects" optionValue="id" optionLabel="title" placeholder="Select Exam Subject" required="true" :class="{'p-invalid': submitted && !questionForm.exam_type_subject_id}" @change="onFormExamSubjectChange" />
           </div>
           <div class="field col-6">
             <label>Associated Lesson</label>
             <Dropdown v-model="questionForm.lesson_id" :options="lessons" optionValue="id" optionLabel="title" placeholder="Optional Lesson" showClear />
+          </div>
+        </div>
+
+        <div class="form-row mb-3">
+          <div class="field col-6">
+            <label>Topic</label>
+            <Dropdown v-model="questionForm.topic_id" :options="topicsForForm" optionValue="id" optionLabel="name" placeholder="Optional Topic" showClear :disabled="!questionForm.exam_type_subject_id" />
           </div>
         </div>
 
@@ -171,11 +236,60 @@
           <label>Shame-Free Explanation (Shown after answer submission)</label>
           <Textarea v-model="questionForm.explanation" rows="2" />
         </div>
+
+        <!-- Human review (edit mode only) -->
+        <div class="review-section mb-3" v-if="questionForm.id">
+          <div class="review-header">
+            <div class="review-check">
+              <Checkbox v-model="questionForm.checked_by_human" inputId="checked_by_human" :binary="true" />
+              <label for="checked_by_human">Checked</label>
+            </div>
+            <span v-if="questionForm.checked_by_human" class="review-badge checked"><i class="pi pi-check"></i> Checked by human</span>
+            <span v-if="questionForm.rejection_reason?.trim()" class="review-badge rejected"><i class="pi pi-times"></i> Rejected</span>
+          </div>
+          <div class="field">
+            <label>Rejection Reason</label>
+            <Textarea v-model="questionForm.rejection_reason" rows="2" placeholder="Leave empty if the question is not rejected" />
+          </div>
+        </div>
       </div>
 
       <template #footer>
         <Button label="Cancel" icon="pi pi-times" class="p-button-text p-button-secondary" @click="hideDialog" />
         <Button label="Save Question" icon="pi pi-check" @click="saveQuestion" />
+      </template>
+    </Dialog>
+
+    <!-- Search Similar Questions Dialog -->
+    <Dialog v-model:visible="similarDialog" header="Search Similar Questions" :modal="true" style="width: 700px">
+      <p class="similar-help">
+        Review these existing questions before creating a new one. If any of these is the same question,
+        click "This is the same question" to tag it with the exam/year above instead of creating a duplicate.
+      </p>
+      <div v-if="similarLoading" class="similar-loading"><i class="pi pi-spin pi-spinner"></i> Searching…</div>
+      <div v-else-if="similarResults.length === 0" class="similar-empty">
+        No similar questions found. It's likely safe to create this as a new question.
+      </div>
+      <div v-else class="similar-results">
+        <div class="similar-result-item" v-for="r in similarResults" :key="r.id">
+          <div class="similar-result-text">
+            <div class="en-text">{{ r.question_text }}</div>
+            <div class="bn-text" v-if="r.question_bn">{{ r.question_bn }}</div>
+            <div class="similar-result-meta">{{ r.exam_subject_title }}</div>
+            <ul class="similar-result-options">
+              <li v-for="(o, i) in r.options" :key="i" :class="{ correct: o.is_correct }">{{ o.option_text }}</li>
+            </ul>
+            <div class="appearance-chips" v-if="r.appearances?.length">
+              <span class="appearance-chip" v-for="(a, i) in r.appearances" :key="i">
+                {{ a.source_batch || (a.exam_type_code + ' ' + (a.year ?? '')) }}
+              </span>
+            </div>
+          </div>
+          <Button label="This is the same question" icon="pi pi-link" class="p-button-sm" @click="recordAppearanceOnExisting(r.id)" />
+        </div>
+      </div>
+      <template #footer>
+        <Button label="Close" icon="pi pi-times" class="p-button-text p-button-secondary" @click="similarDialog = false" />
       </template>
     </Dialog>
 
@@ -193,6 +307,7 @@
           <span class="legend-col col-f">F<br><small>Answer (A/B/C/D)</small></span>
           <span class="legend-col col-g">G<br><small>Subject Title</small></span>
           <span class="legend-col col-h">H<br><small>Explanation (optional)</small></span>
+          <span class="legend-col col-i">I<br><small>Topic (optional)</small></span>
         </div>
       </div>
 
@@ -265,7 +380,7 @@
         <label>Paste rows from Google Sheets</label>
         <Textarea v-model="importForm.tsv_payload" rows="10"
           placeholder="Select and copy rows from your Google Sheet (Ctrl+C), then paste here (Ctrl+V).&#10;The first row is treated as a header if column A equals 'question' or 'Question'." />
-        <small class="helper-text">Rows with missing question or options will be skipped. Col G subject title must match an Exam Subject under the selected Exam Type (case-insensitive).</small>
+        <small class="helper-text">Rows with missing question or options will be skipped. Col G subject title must match an Exam Subject under the selected Exam Type (case-insensitive). Col I topic name is optional — if it doesn't match an existing Topic under that Exam Subject, a new Topic is created automatically.</small>
       </div>
 
       <!-- Client-side parse preview -->
@@ -312,7 +427,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import * as XLSX from 'xlsx'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -321,15 +436,22 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import ToggleSwitch from 'primevue/toggleswitch'
+import Checkbox from 'primevue/checkbox'
 import Dropdown from 'primevue/dropdown'
 import InputNumber from 'primevue/inputnumber'
+import Drawer from 'primevue/drawer'
+import Chip from 'primevue/chip'
 import apiClient from '../../../shared/services/apiClient'
 
 // State
 const questions = ref<any[]>([])
+const questionsLoading = ref(false)
+const pagination = ref({ first: 0, rows: 25, total: 0 })
+let questionsRequestId = 0
 const examTypes = ref<any[]>([])
 const examTypeSubjects = ref<any[]>([])
 const lessons = ref<any[]>([])
+const topics = ref<any[]>([])
 
 const questionDialog = ref(false)
 const importDialog = ref(false)
@@ -345,16 +467,79 @@ const typeOptions = [
   { label: 'Match Answer Pairs', value: 'match_answer' }
 ]
 
+const filterDrawer = ref(false)
 const filters = ref({
+  exam_type_id: null as number | null,
   exam_type_subject_id: null as number | null,
+  topic_id: null as number | null,
   question_type: null as string | null,
   difficulty: null as string | null,
+  year: null as number | 'none' | null,          // 'none' = questions with no known exam year
+  verified_by_ai: null as 1 | 0 | null,
   search: ''
 })
+
+const availableYears = ref<{ year: number; questions: number }[]>([])
+const yearOptions = computed(() => [
+  { label: 'No year', value: 'none' },
+  ...availableYears.value.map(y => ({ label: `${y.year} (${y.questions})`, value: y.year }))
+])
+const verifiedOptions = [
+  { label: 'Verified', value: 1 },
+  { label: 'Not verified', value: 0 }
+]
+
+// Exam subjects offered in the filter follow the selected exam type
+const subjectsForFilter = computed(() => filters.value.exam_type_id
+  ? examTypeSubjects.value.filter(s => s.exam_type_id === filters.value.exam_type_id)
+  : examTypeSubjects.value)
+
+function onExamTypeFilterChange() {
+  const subject = examTypeSubjects.value.find(s => s.id === filters.value.exam_type_subject_id)
+  if (subject && filters.value.exam_type_id && subject.exam_type_id !== filters.value.exam_type_id) {
+    filters.value.exam_type_subject_id = null
+    filters.value.topic_id = null
+  }
+}
+
+type FilterKey = 'exam_type_id' | 'exam_type_subject_id' | 'topic_id' | 'question_type' | 'difficulty' | 'year' | 'verified_by_ai'
+
+// One removable tag per active drawer filter (search stays in the toolbar and has no tag)
+const activeFilterTags = computed(() => {
+  const f = filters.value
+  const tags: { key: FilterKey; label: string }[] = []
+  if (f.exam_type_id !== null) tags.push({ key: 'exam_type_id', label: `Exam: ${examTypes.value.find(e => e.id === f.exam_type_id)?.code ?? f.exam_type_id}` })
+  if (f.exam_type_subject_id !== null) tags.push({ key: 'exam_type_subject_id', label: `Subject: ${examTypeSubjects.value.find(s => s.id === f.exam_type_subject_id)?.title ?? f.exam_type_subject_id}` })
+  if (f.topic_id !== null) tags.push({ key: 'topic_id', label: `Topic: ${topicName(f.topic_id) ?? f.topic_id}` })
+  if (f.question_type !== null) tags.push({ key: 'question_type', label: `Type: ${getTypeName(f.question_type)}` })
+  if (f.difficulty !== null) tags.push({ key: 'difficulty', label: `Difficulty: ${f.difficulty}` })
+  if (f.year !== null) tags.push({ key: 'year', label: f.year === 'none' ? 'Year: none' : `Year: ${f.year}` })
+  if (f.verified_by_ai !== null) tags.push({ key: 'verified_by_ai', label: f.verified_by_ai ? 'AI verified' : 'Not AI verified' })
+  return tags
+})
+const activeFilterCount = computed(() => activeFilterTags.value.length)
+
+function clearFilter(key: FilterKey) {
+  filters.value[key] = null
+  if (key === 'exam_type_subject_id') filters.value.topic_id = null
+}
+
+function clearAllFilters() {
+  (Object.keys(filters.value) as (keyof typeof filters.value)[]).forEach(k => {
+    if (k === 'search') filters.value.search = ''
+    else (filters.value as any)[k] = null
+  })
+}
+
+function questionYears(q: any): number[] {
+  const years = (q.appearances || []).map((a: any) => a.year).filter((y: number | null) => y)
+  return [...new Set<number>(years)].sort((a, b) => a - b)
+}
 
 const questionForm = ref({
   id: null as number | null,
   exam_type_subject_id: null as number | null,
+  topic_id: null as number | null,
   lesson_id: null as number | null,
   question_type: 'mcq' as 'mcq' | 'fill_gap' | 'listen_answer' | 'match_answer',
   question_text: '',
@@ -364,7 +549,9 @@ const questionForm = ref({
   xp_value: 10,
   audio_url: '',
   options: [] as any[],
-  is_active: true
+  is_active: true,
+  checked_by_human: false,
+  rejection_reason: null as string | null
 })
 
 const importForm = ref({
@@ -373,6 +560,17 @@ const importForm = ref({
   source_year: null as number | null,
   tsv_payload: ''
 })
+
+// Exam-year appearance tracking (search-similar / duplicate tagging)
+const appearanceForm = ref({
+  exam_type_id: null as number | null,
+  source_batch: '',
+  year: null as number | null
+})
+const existingAppearances = ref<any[]>([])
+const similarDialog = ref(false)
+const similarResults = ref<any[]>([])
+const similarLoading = ref(false)
 const importResults = ref<any>(null)
 const importLoading = ref(false)
 const parsedPreviewCount = ref<number | null>(null)
@@ -386,12 +584,42 @@ const uploadedFileName = ref('')
 const isDragging = ref(false)
 const parsedFileRows = ref<any[]>([])
 
-async function loadData() {
+// Server-side pagination for the questions table (the full bank is too large to load at once)
+async function fetchQuestions() {
+  const requestId = ++questionsRequestId
+  questionsLoading.value = true
   try {
-    const qRes = await apiClient.get('/admin/questions')
+    const params: Record<string, string | number> = {
+      page: Math.floor(pagination.value.first / pagination.value.rows) + 1,
+      per_page: pagination.value.rows
+    }
+    for (const [key, value] of Object.entries(filters.value)) {
+      if (value === null || value === '') continue
+      if (key === 'year' && value === 'none') params.has_year = 0
+      else params[key] = typeof value === 'string' ? value.trim() : value
+    }
+    const qRes = await apiClient.get('/admin/questions', { params })
+    if (requestId !== questionsRequestId) return   // a newer page/filter request superseded this one
     if (qRes.success) {
       questions.value = qRes.data
+      pagination.value.total = qRes.meta?.total ?? qRes.data.length
     }
+  } catch (error) {
+    console.error('Error loading questions:', error)
+  } finally {
+    if (requestId === questionsRequestId) questionsLoading.value = false
+  }
+}
+
+function onPage(event: { first: number; rows: number }) {
+  pagination.value.first = event.first
+  pagination.value.rows = event.rows
+  fetchQuestions()
+}
+
+async function loadData() {
+  try {
+    await fetchQuestions()
 
     const etRes = await apiClient.get('/admin/exam-types')
     if (etRes.success) {
@@ -407,6 +635,18 @@ async function loadData() {
     if (lesRes.success) {
       lessons.value = lesRes.data
     }
+
+    const topicsRes = await apiClient.get('/admin/topics')
+    if (topicsRes.success) {
+      topics.value = topicsRes.data
+    }
+
+    try {
+      const yearsRes = await apiClient.get('/admin/questions/years')
+      if (yearsRes.success) availableYears.value = yearsRes.data
+    } catch {
+      availableYears.value = []   // year list is optional (e.g. mock mode has no endpoint)
+    }
   } catch (error) {
     console.error('Error loading data:', error)
   }
@@ -421,19 +661,41 @@ onUnmounted(() => {
   window.removeEventListener('quizlo-api-mode-changed', loadData)
 })
 
-const filteredQuestions = computed(() => {
-  return questions.value.filter(q => {
-    if (filters.value.exam_type_subject_id && q.exam_type_subject_id !== filters.value.exam_type_subject_id) return false
-    if (filters.value.question_type && q.question_type !== filters.value.question_type) return false
-    if (filters.value.difficulty && q.difficulty !== filters.value.difficulty) return false
-    if (filters.value.search) {
-      const qText = (q.question_text || '').toLowerCase()
-      const qTextBn = (q.question_bn || '').toLowerCase()
-      const searchVal = filters.value.search.toLowerCase()
-      if (!qText.includes(searchVal) && !qTextBn.includes(searchVal)) return false
-    }
-    return true
-  })
+const topicsForFilter = computed(() => {
+  if (!filters.value.exam_type_subject_id) return topics.value
+  return topics.value.filter(t => t.exam_type_subject_id === filters.value.exam_type_subject_id)
+})
+
+const topicsForForm = computed(() => {
+  if (!questionForm.value.exam_type_subject_id) return []
+  return topics.value.filter(t => t.exam_type_subject_id === questionForm.value.exam_type_subject_id)
+})
+
+function topicName(topicId: number | null | undefined) {
+  if (!topicId) return null
+  return topics.value.find(t => t.id === topicId)?.name ?? null
+}
+
+function onFormExamSubjectChange() {
+  // Topic must belong to the newly selected Exam Subject.
+  if (!topicsForForm.value.find(t => t.id === questionForm.value.topic_id)) {
+    questionForm.value.topic_id = null
+  }
+}
+
+// Filters are applied server-side; any change goes back to page 1 (search is debounced while typing)
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => [filters.value.exam_type_id, filters.value.exam_type_subject_id, filters.value.topic_id, filters.value.question_type, filters.value.difficulty,
+             filters.value.year, filters.value.verified_by_ai], () => {
+  pagination.value.first = 0
+  fetchQuestions()
+})
+watch(() => filters.value.search, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    pagination.value.first = 0
+    fetchQuestions()
+  }, 350)
 })
 
 function getTypeName(type: string | undefined | null) {
@@ -453,6 +715,7 @@ function openNewDialog() {
   questionForm.value = {
     id: null,
     exam_type_subject_id: null,
+    topic_id: null,
     lesson_id: null,
     question_type: 'mcq',
     question_text: '',
@@ -465,18 +728,90 @@ function openNewDialog() {
       { option_text: '', option_text_bn: '', is_correct: true },
       { option_text: '', option_text_bn: '', is_correct: false }
     ],
-    is_active: true
+    is_active: true,
+    checked_by_human: false,
+    rejection_reason: null
   }
   dialogHeader.value = 'Add Question'
   submitted.value = false
+  appearanceForm.value = { exam_type_id: null, source_batch: '', year: null }
+  existingAppearances.value = []
   questionDialog.value = true
 }
 
 function editQuestion(q: any) {
-  questionForm.value = { ...q, options: q.options ? JSON.parse(JSON.stringify(q.options)) : [] }
+  questionForm.value = {
+    ...q,
+    options: q.options ? JSON.parse(JSON.stringify(q.options)) : [],
+    checked_by_human: !!q.checked_by_human,
+    rejection_reason: q.rejection_reason ?? null
+  }
   dialogHeader.value = 'Edit Question'
   submitted.value = false
+  appearanceForm.value = { exam_type_id: null, source_batch: '', year: null }
+  existingAppearances.value = q.appearances ? JSON.parse(JSON.stringify(q.appearances)) : []
   questionDialog.value = true
+}
+
+// ─── Search Similar Questions (duplicate-avoidance) ──────────────────
+
+async function openSearchSimilarDialog() {
+  const q = (questionForm.value.question_text || '').trim()
+  if (q.length < 3) return
+
+  similarDialog.value = true
+  similarLoading.value = true
+  similarResults.value = []
+  try {
+    const res = await apiClient.get('/admin/questions/search-similar', { params: { q } })
+    if (res.success) {
+      similarResults.value = res.data
+    }
+  } catch (error) {
+    console.error('Error searching similar questions:', error)
+  } finally {
+    similarLoading.value = false
+  }
+}
+
+/**
+ * Admin recognized an existing question as the same one — tag it with the
+ * exam+year appearance instead of creating a new question row.
+ */
+async function recordAppearanceOnExisting(questionId: number) {
+  if (!appearanceForm.value.exam_type_id) {
+    alert('Select an Exam Type above before tagging this as an existing question.')
+    return
+  }
+  try {
+    const res = await apiClient.post(`/admin/questions/${questionId}/appearances`, {
+      exam_type_id: appearanceForm.value.exam_type_id,
+      year: appearanceForm.value.year,
+      source_batch: appearanceForm.value.source_batch || null
+    })
+    if (res.success) {
+      similarDialog.value = false
+      questionDialog.value = false
+      await loadData()
+      alert(`Tagged existing question #${questionId} with the selected exam appearance. No duplicate was created.`)
+    }
+  } catch (error) {
+    console.error('Error recording appearance:', error)
+    alert('Failed to record the exam appearance. Please try again.')
+  }
+}
+
+async function removeAppearance(appearanceId: number) {
+  if (!questionForm.value.id) return
+  if (!confirm('Remove this exam appearance tag?')) return
+  try {
+    const res = await apiClient.delete(`/admin/questions/${questionForm.value.id}/appearances/${appearanceId}`)
+    if (res.success) {
+      existingAppearances.value = existingAppearances.value.filter(a => a.id !== appearanceId)
+    }
+  } catch (error) {
+    console.error('Error removing appearance:', error)
+  }
 }
 
 function hideDialog() {
@@ -522,17 +857,26 @@ async function saveQuestion() {
     return
   }
 
+  const payload: any = { ...questionForm.value }
+  if (appearanceForm.value.exam_type_id) {
+    payload.appearance = {
+      exam_type_id: appearanceForm.value.exam_type_id,
+      year: appearanceForm.value.year,
+      source_batch: appearanceForm.value.source_batch || null
+    }
+  }
+
   try {
     if (questionForm.value.id) {
-      const res = await apiClient.put(`/admin/questions/${questionForm.value.id}`, questionForm.value)
+      const res = await apiClient.put(`/admin/questions/${questionForm.value.id}`, payload)
       if (res.success) {
-        const idx = questions.value.findIndex(q => q.id === questionForm.value.id)
-        questions.value[idx] = res.data
+        // Refetch: the update response lacks list-only fields (subject_name, mapped appearances)
+        await fetchQuestions()
       }
     } else {
-      const res = await apiClient.post('/admin/questions', questionForm.value)
+      const res = await apiClient.post('/admin/questions', payload)
       if (res.success) {
-        questions.value.push(res.data)
+        await fetchQuestions()
       }
     }
     questionDialog.value = false
@@ -546,7 +890,11 @@ async function deleteQuestion(id: number) {
   try {
     const res = await apiClient.delete(`/admin/questions/${id}`)
     if (res.success) {
-      questions.value = questions.value.filter(q => q.id !== id)
+      // step back a page if this deleted the last row on the current page
+      if (questions.value.length === 1 && pagination.value.first > 0) {
+        pagination.value.first -= pagination.value.rows
+      }
+      await fetchQuestions()
     }
   } catch (error) {
     console.error('Error deleting question:', error)
@@ -750,6 +1098,7 @@ async function processFile(file: File) {
         const rightAnswer = String(cols[5] ?? '').trim().toUpperCase()
         const subject     = String(cols[6] ?? '').trim()
         const explanation = String(cols[7] ?? '').trim()
+        const topic       = String(cols[8] ?? '').trim()
 
         if (!question.trim() && !optionA && !optionB) continue // blank row
 
@@ -758,7 +1107,7 @@ async function processFile(file: File) {
           continue
         }
 
-        rows.push({ question, optionA, optionB, optionC, optionD, rightAnswer, subject, explanation })
+        rows.push({ question, optionA, optionB, optionC, optionD, rightAnswer, subject, explanation, topic })
       }
 
       uploadedFileName.value = file.name
@@ -795,6 +1144,7 @@ function parseTsvPayload(tsv: string) {
     const rightAnswer = (cols[5] ?? '').trim().toUpperCase()
     const subject    = (cols[6] ?? '').trim()
     const explanation = (cols[7] ?? '').trim()
+    const topic      = (cols[8] ?? '').trim()
 
     // Auto-detect and skip header row (first row where col A is a label)
     if (i === 0 && /^(question|প্রশ্ন|#)/i.test(question)) {
@@ -807,7 +1157,7 @@ function parseTsvPayload(tsv: string) {
       continue
     }
 
-    rows.push({ question, optionA, optionB, optionC, optionD, rightAnswer, subject, explanation })
+    rows.push({ question, optionA, optionB, optionC, optionD, rightAnswer, subject, explanation, topic })
   }
 
   return { rows, skipped }
@@ -859,10 +1209,11 @@ async function runImport() {
     const res = await apiClient.post('/admin/questions/import', payload)
     if (res.success) {
       importResults.value = res.data
-      // Reload question list
-      const qRes = await apiClient.get('/admin/questions')
-      if (qRes.success) {
-        questions.value = qRes.data
+      // Reload question + topic lists (import may have auto-created new topics)
+      await fetchQuestions()
+      const topicsRes = await apiClient.get('/admin/topics')
+      if (topicsRes.success) {
+        topics.value = topicsRes.data
       }
     }
   } catch (err: any) {
@@ -891,11 +1242,45 @@ async function runImport() {
   letter-spacing: -0.01em;
 }
 
-.filter-row {
+.toolbar-row {
   display: flex;
-  gap: 1.25rem;
+  gap: 0.75rem;
   align-items: center;
+}
+
+.search-wrap {
+  flex: 1;
+  min-width: 200px;
+}
+
+.result-count {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.filter-tags {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.drawer-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.drawer-filters .dropdown-w {
+  width: 100%;
+}
+
+.drawer-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
 }
 
 .filter-item {
@@ -974,6 +1359,59 @@ async function runImport() {
 .diff-badge.easy { background-color: #E8F8F0; color: #27AE60; }
 .diff-badge.medium { background-color: #FEF9EC; color: var(--color-accent); }
 .diff-badge.hard { background-color: #FDECEC; color: #E74C3C; }
+
+.years-text { font-size: 0.8rem; }
+.no-year { color: #aaa; }
+.verified-icon { color: #27AE60; margin-left: 0.35rem; font-size: 0.85rem; }
+
+/* Human review */
+.review-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.2rem 0.45rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.review-badge .pi { font-size: 0.65rem; }
+.review-badge.checked { background-color: #E8F8F0; color: #27AE60; }
+.review-badge.rejected { background-color: #FDECEC; color: #E74C3C; }
+
+.review-section {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.review-check label {
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+}
 
 .actions-group {
   display: flex;
@@ -1183,6 +1621,7 @@ async function runImport() {
 .legend-col.col-f { background: #FFF7ED; color: #EA580C; border-color: #FED7AA; }
 .legend-col.col-g { background: var(--color-primary-surface); color: var(--color-primary); border-color: var(--color-primary-light, #C7D2FE); }
 .legend-col.col-h { background: #F8F8F8; color: #6B7280; border-color: #E5E7EB; }
+.legend-col.col-i { background: #F5F3FF; color: #7C3AED; border-color: #DDD6FE; }
 
 .helper-text {
   font-size: 0.72rem;
@@ -1432,6 +1871,98 @@ async function runImport() {
 .required-star {
   color: #E74C3C;
   margin-left: 2px;
+}
+
+/* ---- Search Similar / Exam Appearances ---- */
+.search-similar-btn {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
+.appearance-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.appearance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--color-primary-surface);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 50px;
+}
+
+.appearance-chip .pi-times {
+  cursor: pointer;
+  font-size: 0.65rem;
+  opacity: 0.7;
+}
+
+.appearance-chip .pi-times:hover {
+  opacity: 1;
+}
+
+.similar-help {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+}
+
+.similar-loading,
+.similar-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.similar-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.similar-result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--color-bg-scaffold);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.similar-result-text {
+  flex: 1;
+}
+
+.similar-result-meta {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 0.25rem;
+}
+
+.similar-result-options {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.similar-result-options li.correct {
+  color: #27AE60;
+  font-weight: 700;
 }
 </style>
 

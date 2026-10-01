@@ -53,6 +53,11 @@ const router = createRouter({
           path: 'exam-type-subjects',
           name: 'exam-type-subjects',
           component: () => import('../modules/subjects/pages/ExamTypeSubjectsPage.vue')
+        },
+        {
+          path: 'topics',
+          name: 'topics',
+          component: () => import('../modules/subjects/pages/TopicsPage.vue')
         }
       ]
     }

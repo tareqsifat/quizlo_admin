@@ -26,7 +26,18 @@ export interface Question {
   audio_url?: string // Audio attachment for listen_answer
   options: QuestionOption[]
   exam_types?: any[]
+  appearances?: QuestionAppearance[]
   created_at: string
+}
+
+export interface QuestionAppearance {
+  id: number
+  question_id: number
+  exam_type_id: number
+  exam_type_name?: string
+  exam_type_code?: string
+  year?: number | null
+  source_batch?: string | null
 }
 
 export interface Subject {
@@ -58,6 +69,21 @@ export interface ExamTypeSubjectEntry {
   subject_name_bn: string
   title: string
   title_bn?: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Topic {
+  id: number
+  exam_type_subject_id: number
+  exam_subject_title?: string
+  exam_type_id?: number
+  exam_type_name?: string
+  name: string
+  name_bn?: string
+  sort_order: number
+  question_count?: number
   is_active: boolean
   created_at: string
   updated_at: string
@@ -179,6 +205,19 @@ const examTypeSubjectEntries = ref<ExamTypeSubjectEntry[]>([
     id: 3, exam_type_id: 1, exam_type_name: 'BCS Preliminary',
     subject_id: 3, subject_name: 'Bangladesh Affairs', subject_name_bn: 'বাংলাদেশ বিষয়াবলী',
     title: 'বাংলাদেশ বিষয়াবলী', title_bn: 'বাংলাদেশ বিষয়াবলী',
+    is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
+])
+
+const topics = ref<Topic[]>([
+  {
+    id: 1, exam_type_subject_id: 2, exam_subject_title: 'English', exam_type_id: 1, exam_type_name: 'BCS Preliminary',
+    name: 'Parts of Speech', name_bn: 'পদ প্রকরণ', sort_order: 1, question_count: 1,
+    is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
+  {
+    id: 2, exam_type_subject_id: 1, exam_subject_title: 'বাংলা ভাষা ও সাহিত্য', exam_type_id: 1, exam_type_name: 'BCS Preliminary',
+    name: 'Modern Period', name_bn: 'আধুনিক যুগ', sort_order: 1, question_count: 1,
     is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
   },
 ])
@@ -585,6 +624,65 @@ export const mockDb = {
     return true
   },
 
+  // ── Topics (Feature 3) ──
+  getTopics() {
+    return [...topics.value]
+  },
+  getTopicsForExamTypeSubject(examTypeSubjectId: number) {
+    return topics.value
+      .filter(t => t.exam_type_subject_id === examTypeSubjectId && t.is_active)
+      .map(t => ({ id: t.id, name: t.name, name_bn: t.name_bn, sort_order: t.sort_order }))
+  },
+  createTopic(data: any) {
+    const examTypeSubjectId = data.exam_type_subject_id
+    const name = data.name?.trim()
+
+    if (topics.value.find(t => t.exam_type_subject_id === examTypeSubjectId && t.name.toLowerCase() === name.toLowerCase())) {
+      throw { response: { status: 422, data: { errors: { name: [`Another Topic already uses the name "${name}" under this Exam Subject.`] } } } }
+    }
+
+    const ets = examTypeSubjectEntries.value.find(e => e.id === examTypeSubjectId)
+    const newId = Math.max(...topics.value.map(t => t.id), 0) + 1
+    const newTopic: Topic = {
+      id: newId,
+      exam_type_subject_id: examTypeSubjectId,
+      exam_subject_title: ets?.title ?? 'Unknown',
+      exam_type_id: ets?.exam_type_id,
+      exam_type_name: ets?.exam_type_name,
+      name, name_bn: data.name_bn ?? undefined,
+      sort_order: data.sort_order ?? 0,
+      question_count: 0,
+      is_active: data.is_active !== undefined ? data.is_active : true,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    }
+    topics.value.push(newTopic)
+    return newTopic
+  },
+  updateTopic(id: number, data: any) {
+    const index = topics.value.findIndex(t => t.id === id)
+    if (index === -1) throw new Error('Not Found')
+    const current = topics.value[index]!
+    const examTypeSubjectId = data.exam_type_subject_id ?? current.exam_type_subject_id
+    const name = data.name ?? current.name
+
+    if (topics.value.find(t => t.id !== id && t.exam_type_subject_id === examTypeSubjectId && t.name.toLowerCase() === name.toLowerCase())) {
+      throw { response: { status: 422, data: { errors: { name: [`Another Topic already uses the name "${name}" under this Exam Subject.`] } } } }
+    }
+
+    topics.value[index] = { ...current, ...data, updated_at: new Date().toISOString() }
+    return topics.value[index]
+  },
+  deleteTopic(id: number) {
+    const topic = topics.value.find(t => t.id === id)
+    if (!topic) throw new Error('Not Found')
+    if ((topic.question_count ?? 0) > 0) {
+      throw { response: { status: 422, data: { message: `Cannot delete: ${topic.question_count} question(s) are linked to this Topic. Remove or reassign the questions first.` } } }
+    }
+    const index = topics.value.findIndex(t => t.id === id)
+    topics.value.splice(index, 1)
+    return true
+  },
+
   // ── Lessons ──
   getLessons() {
     return [...lessons.value]
@@ -669,9 +767,13 @@ export const mockDb = {
           source_year: et.source_year
         }
       }),
+      appearances: [],
       created_at: new Date().toISOString()
     }
     questions.value.push(newQ)
+    if (data.appearance && data.appearance.exam_type_id) {
+      this.createQuestionAppearance(newId, data.appearance)
+    }
     return newQ
   },
   updateQuestion(id: number, data: any) {
@@ -712,6 +814,57 @@ export const mockDb = {
     }
     return false
   },
+  // ── Question Exam-Year Appearances (search-similar / duplicate tagging) ──
+  searchSimilarQuestions(q: string) {
+    const needle = (q || '').toLowerCase().trim()
+    if (needle.length < 3) return []
+    return questions.value
+      .filter(qq => qq.is_active && (
+        qq.question_text.toLowerCase().includes(needle) ||
+        (qq.question_bn || '').toLowerCase().includes(needle)
+      ))
+      .slice(0, 10)
+      .map(qq => ({
+        id: qq.id,
+        question_text: qq.question_text,
+        question_bn: qq.question_bn,
+        exam_subject_title: subjects.value.find(s => s.id === qq.subject_id)?.name,
+        options: qq.options.map(o => ({ option_text: o.option_text, is_correct: o.is_correct })),
+        appearances: qq.appearances || []
+      }))
+  },
+  getQuestionAppearances(questionId: number) {
+    const q = questions.value.find(qq => qq.id === questionId)
+    return q?.appearances || []
+  },
+  createQuestionAppearance(questionId: number, data: any) {
+    const q = questions.value.find(qq => qq.id === questionId)
+    if (!q) throw new Error('Not Found')
+    if (!q.appearances) q.appearances = []
+
+    const existing = q.appearances.find(a => a.exam_type_id === data.exam_type_id && a.year === data.year)
+    if (existing) return existing
+
+    const fullEt = examTypes.value.find(e => e.id === data.exam_type_id)
+    const appearance: QuestionAppearance = {
+      id: Math.floor(Math.random() * 100000),
+      question_id: questionId,
+      exam_type_id: data.exam_type_id,
+      exam_type_name: fullEt ? fullEt.name : undefined,
+      exam_type_code: fullEt ? fullEt.code : 'GEN',
+      year: data.year ?? null,
+      source_batch: data.source_batch ?? null
+    }
+    q.appearances.push(appearance)
+    return appearance
+  },
+  deleteQuestionAppearance(questionId: number, appearanceId: number) {
+    const q = questions.value.find(qq => qq.id === questionId)
+    if (!q || !q.appearances) return false
+    q.appearances = q.appearances.filter(a => a.id !== appearanceId)
+    return true
+  },
+
   importQuestions(examTypeId: number, sourceBatch: string, sourceYear: number, questionList: any[]) {
     let imported = 0
     let skipped = 0

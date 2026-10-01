@@ -6,7 +6,11 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api
 
 const client = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  // The unpaginated /admin/questions listing can take several seconds once
+  // the bank has thousands of rows (pre-existing scalability limit, not
+  // introduced here) — a generous timeout avoids spurious failures on that
+  // one heavy endpoint rather than making every other call wait needlessly.
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -165,6 +169,26 @@ client.interceptors.request.use((config) => {
       if (method === 'delete') return resolveMock(mockDb.deleteExamTypeSubjectEntry(etsId))
     }
 
+    // 3c. Topics — full CRUD
+    const topicsForExamSubjectMatch = url.match(/^\/?admin\/topics\/for-exam-type-subject\/(\d+)$/)
+    if (topicsForExamSubjectMatch && method === 'get') {
+      return resolveMock(mockDb.getTopicsForExamTypeSubject(parseInt(topicsForExamSubjectMatch[1]!)))
+    }
+    if (url.match(/^\/?admin\/topics$/)) {
+      if (method === 'get') {
+        return resolveMock(mockDb.getTopics())
+      }
+      if (method === 'post') {
+        return resolveMock(mockDb.createTopic(data))
+      }
+    }
+    const topicMatch = url.match(/^\/?admin\/topics\/(\d+)$/)
+    if (topicMatch) {
+      const topicId = parseInt(topicMatch[1]!)
+      if (method === 'put')    return resolveMock(mockDb.updateTopic(topicId, data))
+      if (method === 'delete') return resolveMock(mockDb.deleteTopic(topicId))
+    }
+
     // 5. Questions import (updated: uses exam-type-subject matching)
     if (url.match(/^\/?admin\/questions\/import/)) {
       // Build exam-subject lookup map for this exam type
@@ -177,6 +201,7 @@ client.interceptors.request.use((config) => {
       let imported = 0, skipped = 0
       const failed: any[] = []
       const notices: any[] = []
+      const topicMapByEts: Record<number, Record<string, number>> = {}
 
       ;(data.rows || []).forEach((row: any, idx: number) => {
         const rowNum = idx + 1
@@ -189,7 +214,25 @@ client.interceptors.request.use((config) => {
           failed.push({ row: rowNum, subject_raw: row.subject, reason: `No Exam Subject found for "${row.subject}" under the selected Exam Type.` })
           return
         }
-        mockDb.createQuestion({ subject_id: etsId, question_text: row.question, question_type: 'mcq', explanation: row.explanation, difficulty: 'medium', xp_value: 10,
+
+        let topicId: number | null = null
+        const topicRaw = (row.topic || '').trim()
+        if (topicRaw) {
+          if (!topicMapByEts[etsId]) {
+            const map: Record<string, number> = {}
+            mockDb.getTopicsForExamTypeSubject(etsId).forEach((t: any) => { map[t.name.toLowerCase().trim()] = t.id })
+            topicMapByEts[etsId] = map
+          }
+          const topicKey = topicRaw.toLowerCase()
+          topicId = topicMapByEts[etsId]![topicKey] ?? null
+          if (!topicId) {
+            const newTopic = mockDb.createTopic({ exam_type_subject_id: etsId, name: topicRaw, name_bn: topicRaw, sort_order: 0 })
+            topicId = newTopic.id
+            topicMapByEts[etsId]![topicKey] = topicId
+          }
+        }
+
+        mockDb.createQuestion({ subject_id: etsId, topic_id: topicId, question_text: row.question, question_type: 'mcq', explanation: row.explanation, difficulty: 'medium', xp_value: 10,
           options: [
             { option_text: row.optionA, is_correct: row.rightAnswer === 'A' },
             { option_text: row.optionB, is_correct: row.rightAnswer === 'B' },
@@ -226,6 +269,22 @@ client.interceptors.request.use((config) => {
       if (method === 'delete') {
         return resolveMock(mockDb.deleteQuestion(parseInt(questionMatch[1]!)))
       }
+    }
+
+    // 5b. Question search-similar + exam-year appearances
+    if (url.match(/^\/?admin\/questions\/search-similar$/) && method === 'get') {
+      const q = (config.params && config.params.q) || ''
+      return resolveMock(mockDb.searchSimilarQuestions(q))
+    }
+    const appearancesListMatch = url.match(/^\/?admin\/questions\/(\d+)\/appearances$/)
+    if (appearancesListMatch) {
+      const qId = parseInt(appearancesListMatch[1]!)
+      if (method === 'get')  return resolveMock(mockDb.getQuestionAppearances(qId))
+      if (method === 'post') return resolveMock(mockDb.createQuestionAppearance(qId, data))
+    }
+    const appearanceDeleteMatch = url.match(/^\/?admin\/questions\/(\d+)\/appearances\/(\d+)$/)
+    if (appearanceDeleteMatch && method === 'delete') {
+      return resolveMock(mockDb.deleteQuestionAppearance(parseInt(appearanceDeleteMatch[1]!), parseInt(appearanceDeleteMatch[2]!)))
     }
 
     // 6. Users

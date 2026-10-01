@@ -55,6 +55,7 @@ import {
   Calendar, 
   BookMarked,
   Tag,
+  GitBranch,
   LogOut
 } from 'lucide-vue-next'
 
@@ -88,6 +89,7 @@ const navItems = [
   { label: 'Exam Types',   path: '/exam-types',          icon: Layers },
   { label: 'Subjects',     path: '/subjects',            icon: BookMarked },
   { label: 'Exam Subjects',path: '/exam-type-subjects',  icon: Tag },
+  { label: 'Topics',       path: '/topics',              icon: GitBranch },
   { label: 'Lessons',      path: '/lessons',             icon: BookOpen },
   { label: 'Questions',    path: '/questions',           icon: HelpCircle },
   { label: 'Users',        path: '/users',               icon: Users },
