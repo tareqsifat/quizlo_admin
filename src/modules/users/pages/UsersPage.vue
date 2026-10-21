@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
@@ -85,12 +85,8 @@ async function loadUsers() {
 
 onMounted(() => {
   loadUsers()
-  window.addEventListener('quizlo-api-mode-changed', loadUsers)
 })
 
-onUnmounted(() => {
-  window.removeEventListener('quizlo-api-mode-changed', loadUsers)
-})
 
 async function toggleUserStatus(id: number) {
   try {

@@ -39,6 +39,10 @@
           <Dropdown v-model="filters.topic_id" :options="topicsForFilter" optionValue="id" optionLabel="name" placeholder="All Topics" showClear class="dropdown-w" />
         </div>
         <div class="filter-item">
+          <label>Topic Tagging</label>
+          <Dropdown v-model="filters.has_topic" :options="topicTagOptions" optionValue="value" optionLabel="label" placeholder="Tagged & untagged" showClear class="dropdown-w" />
+        </div>
+        <div class="filter-item">
           <label>Question Type</label>
           <Dropdown v-model="filters.question_type" :options="typeOptions" optionValue="value" optionLabel="label" placeholder="All Types" showClear class="dropdown-w" />
         </div>
@@ -427,7 +431,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import * as XLSX from 'xlsx'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -472,6 +476,7 @@ const filters = ref({
   exam_type_id: null as number | null,
   exam_type_subject_id: null as number | null,
   topic_id: null as number | null,
+  has_topic: null as 1 | 0 | null,                // 0 = questions not yet assigned to any topic
   question_type: null as string | null,
   difficulty: null as string | null,
   year: null as number | 'none' | null,          // 'none' = questions with no known exam year
@@ -484,6 +489,10 @@ const yearOptions = computed(() => [
   { label: 'No year', value: 'none' },
   ...availableYears.value.map(y => ({ label: `${y.year} (${y.questions})`, value: y.year }))
 ])
+const topicTagOptions = [
+  { label: 'Has a topic', value: 1 },
+  { label: 'No topic yet', value: 0 }
+]
 const verifiedOptions = [
   { label: 'Verified', value: 1 },
   { label: 'Not verified', value: 0 }
@@ -502,7 +511,7 @@ function onExamTypeFilterChange() {
   }
 }
 
-type FilterKey = 'exam_type_id' | 'exam_type_subject_id' | 'topic_id' | 'question_type' | 'difficulty' | 'year' | 'verified_by_ai'
+type FilterKey = 'exam_type_id' | 'exam_type_subject_id' | 'topic_id' | 'has_topic' | 'question_type' | 'difficulty' | 'year' | 'verified_by_ai'
 
 // One removable tag per active drawer filter (search stays in the toolbar and has no tag)
 const activeFilterTags = computed(() => {
@@ -511,6 +520,7 @@ const activeFilterTags = computed(() => {
   if (f.exam_type_id !== null) tags.push({ key: 'exam_type_id', label: `Exam: ${examTypes.value.find(e => e.id === f.exam_type_id)?.code ?? f.exam_type_id}` })
   if (f.exam_type_subject_id !== null) tags.push({ key: 'exam_type_subject_id', label: `Subject: ${examTypeSubjects.value.find(s => s.id === f.exam_type_subject_id)?.title ?? f.exam_type_subject_id}` })
   if (f.topic_id !== null) tags.push({ key: 'topic_id', label: `Topic: ${topicName(f.topic_id) ?? f.topic_id}` })
+  if (f.has_topic !== null) tags.push({ key: 'has_topic', label: f.has_topic ? 'Has a topic' : 'No topic yet' })
   if (f.question_type !== null) tags.push({ key: 'question_type', label: `Type: ${getTypeName(f.question_type)}` })
   if (f.difficulty !== null) tags.push({ key: 'difficulty', label: `Difficulty: ${f.difficulty}` })
   if (f.year !== null) tags.push({ key: 'year', label: f.year === 'none' ? 'Year: none' : `Year: ${f.year}` })
@@ -645,7 +655,7 @@ async function loadData() {
       const yearsRes = await apiClient.get('/admin/questions/years')
       if (yearsRes.success) availableYears.value = yearsRes.data
     } catch {
-      availableYears.value = []   // year list is optional (e.g. mock mode has no endpoint)
+      availableYears.value = []   // year list is optional
     }
   } catch (error) {
     console.error('Error loading data:', error)
@@ -654,12 +664,8 @@ async function loadData() {
 
 onMounted(() => {
   loadData()
-  window.addEventListener('quizlo-api-mode-changed', loadData)
 })
 
-onUnmounted(() => {
-  window.removeEventListener('quizlo-api-mode-changed', loadData)
-})
 
 const topicsForFilter = computed(() => {
   if (!filters.value.exam_type_subject_id) return topics.value
@@ -685,7 +691,7 @@ function onFormExamSubjectChange() {
 
 // Filters are applied server-side; any change goes back to page 1 (search is debounced while typing)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
-watch(() => [filters.value.exam_type_id, filters.value.exam_type_subject_id, filters.value.topic_id, filters.value.question_type, filters.value.difficulty,
+watch(() => [filters.value.exam_type_id, filters.value.exam_type_subject_id, filters.value.topic_id, filters.value.has_topic, filters.value.question_type, filters.value.difficulty,
              filters.value.year, filters.value.verified_by_ai], () => {
   pagination.value.first = 0
   fetchQuestions()

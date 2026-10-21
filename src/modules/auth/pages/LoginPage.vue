@@ -12,15 +12,6 @@
         <p class="subtitle">Access secure statistics, exam configurations, and student management.</p>
       </div>
 
-      <!-- Mode Selector Badge -->
-      <div class="mode-selector-container">
-        <div class="mode-badge" :class="isMockMode ? 'badge-mock' : 'badge-live'" @click="toggleMode" title="Click to toggle connection mode">
-          <span class="pulse-dot"></span>
-          <span>{{ isMockMode ? 'MOCK MODE (OFFLINE)' : 'LIVE API SERVER' }}</span>
-          <i class="pi pi-sync icon-refresh"></i>
-        </div>
-      </div>
-
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="form-group">
           <label for="email">Admin Email Address</label>
@@ -43,7 +34,7 @@
           <div class="input-wrapper">
             <i class="pi pi-lock input-icon"></i>
             <input 
-              type="password" 
+              :type="showPassword ? 'text' : 'password'" 
               id="password" 
               v-model="password" 
               placeholder="••••••••" 
@@ -51,9 +42,18 @@
               :disabled="loading"
               autocomplete="current-password"
             />
+            <button
+              type="button"
+              class="toggle-password-btn"
+              @click="showPassword = !showPassword"
+              :title="showPassword ? 'Hide password' : 'Show password'"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :disabled="loading"
+            >
+              <i :class="showPassword ? 'pi pi-eye-slash' : 'pi pi-eye'"></i>
+            </button>
           </div>
         </div>
-
 
         <!-- Error Banner -->
         <transition name="slide-up">
@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../store/authStore'
 import apiClient from '../../../shared/services/apiClient'
@@ -87,38 +87,7 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const errorMessage = ref<string | null>(null)
-const isMockMode = ref(true)
-
-onMounted(() => {
-  // Sync state with local storage
-  const saved = localStorage.getItem('quizlo_api_mock')
-  if (saved !== null) {
-    isMockMode.value = saved === 'true'
-  } else {
-    localStorage.setItem('quizlo_api_mock', 'true')
-  }
-})
-
-function toggleMode() {
-  isMockMode.value = !isMockMode.value
-  localStorage.setItem('quizlo_api_mock', isMockMode.value ? 'true' : 'false')
-  // Clear inputs on toggle
-  email.value = ''
-  password.value = ''
-  errorMessage.value = null
-  // Broadcast mode change to app layouts
-  window.dispatchEvent(new CustomEvent('quizlo-api-mode-changed', { detail: isMockMode.value }))
-}
-
-function autofill() {
-  if (isMockMode.value) {
-    email.value = 'admin@quizlo.app'
-    password.value = 'password'
-  } else {
-    email.value = 'admin@quizlo.com'
-    password.value = 'password'
-  }
-}
+const showPassword = ref(false)
 
 async function handleLogin() {
   loading.value = true
@@ -207,76 +176,6 @@ async function handleLogin() {
   line-height: 1.5;
 }
 
-.mode-selector-container {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-}
-
-.mode-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.45rem 1rem;
-  border-radius: 50px;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: var(--transition-smooth);
-  box-shadow: var(--shadow-sm);
-}
-
-.mode-badge:hover {
-  transform: translateY(-1px);
-}
-
-.badge-mock {
-  background-color: #FEF9EC;
-  color: var(--color-accent-dark);
-  border: 1px solid rgba(243, 156, 18, 0.2);
-}
-
-.badge-live {
-  background-color: #E8F8F0;
-  color: var(--color-primary-dark);
-  border: 1px solid rgba(91, 79, 220, 0.2);
-}
-
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: currentColor;
-}
-
-.badge-live .pulse-dot {
-  box-shadow: 0 0 0 3px rgba(91, 79, 220, 0.2);
-  animation: pulse 1.8s infinite;
-}
-
-.badge-mock .pulse-dot {
-  box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.2);
-  animation: pulse-mock 1.8s infinite;
-}
-
-.icon-refresh {
-  font-size: 0.7rem;
-  margin-left: 0.25rem;
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(91, 79, 220, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(91, 79, 220, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(91, 79, 220, 0); }
-}
-
-@keyframes pulse-mock {
-  0% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(243, 156, 18, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0); }
-}
-
 .login-form {
   display: flex;
   flex-direction: column;
@@ -319,6 +218,10 @@ async function handleLogin() {
   transition: var(--transition-smooth);
 }
 
+.input-wrapper input#password {
+  padding-right: 2.75rem;
+}
+
 .input-wrapper input:focus {
   outline: none;
   border-color: var(--color-primary);
@@ -326,65 +229,29 @@ async function handleLogin() {
   box-shadow: 0 0 0 3px var(--color-primary-surface);
 }
 
-.hint-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  background-color: var(--color-primary-surface);
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
-  border: 1px solid rgba(91, 79, 220, 0.1);
-  position: relative;
-}
-
-.hint-icon {
-  color: var(--color-primary);
-  font-size: 1rem;
-  margin-top: 0.15rem;
-}
-
-.hint-title {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--color-primary-dark);
-  margin-bottom: 0.15rem;
-}
-
-.hint-text {
-  font-size: 0.725rem;
-  color: var(--color-primary-dark);
-  line-height: 1.4;
-}
-
-.code-select {
-  font-family: monospace;
-  background-color: rgba(91, 79, 220, 0.08);
-  padding: 0.05rem 0.25rem;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-.autofill-btn {
+.toggle-password-btn {
   position: absolute;
-  right: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background-color: var(--color-primary);
-  color: white;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
   border: none;
   border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.35rem 0.65rem;
+  background: transparent;
+  color: var(--color-text-hint);
   cursor: pointer;
   transition: var(--transition-smooth);
-  box-shadow: 0 2px 5px rgba(91, 79, 220, 0.15);
 }
 
-.autofill-btn:hover {
-  background-color: var(--color-primary-light);
-  transform: translateY(-50%) translateY(-1px);
+.toggle-password-btn:hover:not(:disabled) {
+  color: var(--color-primary);
+  background-color: var(--color-primary-surface);
+}
+
+.toggle-password-btn:disabled {
+  cursor: not-allowed;
 }
 
 .error-banner {

@@ -8,11 +8,13 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../modules/auth/pages/LoginPage.vue')
+      component: () => import('../modules/auth/pages/LoginPage.vue'),
+      meta: { guestOnly: true }
     },
     {
       path: '/',
       component: DashboardLayout,
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -64,14 +66,14 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
   const authStore = useAuthStore()
-  if (to.path !== '/login' && !authStore.isAuthenticated) {
-    next('/login')
-  } else if (to.path === '/login' && authStore.isAuthenticated) {
-    next('/')
-  } else {
-    next()
+  // Any route that isn't explicitly guest-only requires a logged-in admin
+  if (!to.meta.guestOnly && !authStore.isAuthenticated) {
+    return { name: 'login' }
+  }
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return { name: 'dashboard' }
   }
 })
 

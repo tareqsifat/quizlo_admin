@@ -108,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -168,12 +168,8 @@ async function loadData() {
 
 onMounted(() => {
   loadData()
-  window.addEventListener('quizlo-api-mode-changed', loadData)
 })
 
-onUnmounted(() => {
-  window.removeEventListener('quizlo-api-mode-changed', loadData)
-})
 
 // Dialog controls
 function openNewDialog() {

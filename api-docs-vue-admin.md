@@ -414,6 +414,7 @@ Paginated list of all questions with optional filters.
 | `exam_type_id` | integer | ❌       | Filter by exam type                    |
 | `subject_id`   | integer | ❌       | Filter by subject                      |
 | `topic_id`     | integer | ❌       | Filter by topic                        |
+| `has_topic`    | boolean | ❌       | `1` = only questions with a topic, `0` = only questions without one |
 | `difficulty`   | string  | ❌       | Filter: `easy`, `medium`, `hard`       |
 | `is_active`    | boolean | ❌       | Filter by active status (`1` or `0`)   |
 | `search`       | string  | ❌       | Search in question_text (min 3 chars)  |
@@ -670,6 +671,52 @@ Bulk imports questions from a structured JSON payload (for BCS PDF import).
     "message": "100 questions imported, 3 skipped."
 }
 ```
+
+---
+
+### POST /admin/questions/bulk-assign-topic
+
+Sets the topic of up to 500 questions at once (`"topic_id": null` clears it). Every question must
+belong to the topic's Exam Subject; otherwise nothing is changed and the response is `422` with
+`data.mismatched_question_ids` (or `data.missing_question_ids`).
+
+**Authentication:** Required (`admin` scope)
+
+```json
+{ "question_ids": [101, 102, 103], "topic_id": 53 }
+```
+
+**Success Response `200 OK`**
+
+```json
+{ "success": true, "message": "3 question(s) updated.", "data": { "updated": 3, "topic_id": 53 } }
+```
+
+---
+
+### POST /admin/topics/import
+
+Bulk create/update topics for one exam type (the TOPIC_LIST spreadsheet). `subject` is matched
+case-insensitively against the Exam Subject title; an existing topic with the same name under that
+Exam Subject is updated, not duplicated. Up to 1000 rows per request.
+
+**Authentication:** Required (`admin` scope)
+
+```json
+{
+    "exam_type_id": 1,
+    "rows": [{ "subject": "English Grammar", "name": "Tense", "name_bn": "টেন্স", "sort_order": 8 }]
+}
+```
+
+**Success Response `200 OK`**
+
+```json
+{ "success": true, "data": { "created": 1, "updated": 0, "unchanged": 0, "failed": [] } }
+```
+
+`GET /admin/topics` rows also carry `servable_question_count`: the questions the app will actually
+serve for that topic (active and not merged), next to `question_count`.
 
 ---
 
