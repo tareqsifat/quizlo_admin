@@ -77,6 +77,25 @@
           <span class="footer-meta">Active exam categories: <strong>{{ stats.content.total_exam_types }}</strong></span>
         </div>
       </div>
+
+      <!-- Human Review KPI Card -->
+      <div class="dashboard-card stat-card border-teal">
+        <div class="card-header">
+          <div class="icon-wrapper bg-teal">
+            <ShieldCheckIcon class="icon" />
+          </div>
+        </div>
+        <div class="card-body">
+          <h3 class="stat-number">{{ stats.review.human_verified }}</h3>
+          <span class="stat-label">Human Verified Questions</span>
+        </div>
+        <div class="card-footer">
+          <span class="footer-meta">
+            <span class="review-accepted">Accepted: <strong>{{ stats.review.accepted }}</strong></span> |
+            <span class="review-rejected">Rejected: <strong>{{ stats.review.rejected }}</strong></span>
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Main Workspace Widgets -->
@@ -140,7 +159,8 @@ import {
   Users as UsersIcon, 
   BookOpen as BookOpenIcon, 
   Activity as ActivityIcon, 
-  Award as AwardIcon 
+  Award as AwardIcon,
+  ShieldCheck as ShieldCheckIcon
 } from 'lucide-vue-next'
 import apiClient from '../../../shared/services/apiClient'
 
@@ -148,6 +168,7 @@ const stats = ref({
   users: { total: 0, active_today: 0, new_this_week: 0, active_this_month: 0 },
   content: { total_questions: 0, total_lessons: 0, total_subjects: 0, total_exam_types: 0 },
   engagement: { answers_submitted_today: 0, lessons_completed_today: 0, model_tests_today: 0 },
+  review: { human_verified: 0, accepted: 0, rejected: 0 },
   top_exam_types: [] as any[]
 })
 
@@ -195,6 +216,7 @@ onUnmounted(() => {
 .border-orange { border-left: 4px solid var(--color-accent); }
 .border-blue { border-left: 4px solid #3498DB; }
 .border-green { border-left: 4px solid #27AE60; }
+.border-teal { border-left: 4px solid #16A085; }
 
 .card-header {
   display: flex;
@@ -215,6 +237,10 @@ onUnmounted(() => {
 .bg-orange { background-color: #FEF9EC; color: var(--color-accent); }
 .bg-blue { background-color: #EBF5FB; color: #3498DB; }
 .bg-green { background-color: #E8F8F0; color: #27AE60; }
+.bg-teal { background-color: #E8F6F3; color: #16A085; }
+
+.review-accepted strong { color: #27AE60; }
+.review-rejected strong { color: #E74C3C; }
 
 .icon {
   width: 22px;

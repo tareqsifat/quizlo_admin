@@ -414,6 +414,11 @@ export const mockDb = {
         lessons_completed_today: 1204,
         model_tests_today: 302
       },
+      review: {
+        human_verified: 1840,
+        accepted: 1712,
+        rejected: 131
+      },
       top_exam_types: examTypes.value.map(et => ({
         id: et.id,
         name: et.name,
