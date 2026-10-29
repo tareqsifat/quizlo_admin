@@ -56,6 +56,7 @@ import {
   BookMarked,
   Tag,
   GitBranch,
+  ScrollText,
   LogOut
 } from 'lucide-vue-next'
 
@@ -94,6 +95,7 @@ const navItems = [
   { label: 'Questions',    path: '/questions',           icon: HelpCircle },
   { label: 'Users',        path: '/users',               icon: Users },
   { label: 'Model Tests',  path: '/exams',               icon: Calendar },
+  { label: 'Activity Logs',path: '/activity-logs',       icon: ScrollText },
 ]
 
 function toggleCollapse() {

@@ -288,6 +288,11 @@ client.interceptors.request.use((config) => {
     }
 
     // 6. Users
+    // Activity logs are only recorded by the live backend
+    if (url.match(/^\/?admin\/activity-logs(\/admins)?$/) && method === 'get') {
+      return resolveMock([])
+    }
+
     if (url.match(/^\/?admin\/users$/)) {
       return resolveMock(mockDb.getUsers())
     }

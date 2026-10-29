@@ -58,6 +58,11 @@ const router = createRouter({
           path: 'topics',
           name: 'topics',
           component: () => import('../modules/subjects/pages/TopicsPage.vue')
+        },
+        {
+          path: 'activity-logs',
+          name: 'activity-logs',
+          component: () => import('../modules/activity/pages/ActivityLogsPage.vue')
         }
       ]
     }
