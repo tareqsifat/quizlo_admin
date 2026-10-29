@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+// Clean up sessions left behind by the removed offline mock mode.
+localStorage.removeItem('quizlo_api_mock')
+if (localStorage.getItem('quizlo_admin_token')?.startsWith('mock_')) {
+  localStorage.removeItem('quizlo_admin_token')
+  localStorage.removeItem('quizlo_admin_user')
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('quizlo_admin_token'))
   const isAuthenticated = ref<boolean>(!!token.value)

@@ -140,7 +140,7 @@
             </div>
             <div class="log-item">
               <div class="log-time">12:30</div>
-              <div class="log-desc">Mock server synchronization completed.</div>
+              <div class="log-desc">Server synchronization completed.</div>
             </div>
             <div class="log-item">
               <div class="log-time">09:12</div>
@@ -154,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { 
   Users as UsersIcon, 
   BookOpen as BookOpenIcon, 
@@ -185,12 +185,8 @@ async function fetchStats() {
 
 onMounted(() => {
   fetchStats()
-  window.addEventListener('quizlo-api-mode-changed', fetchStats)
 })
 
-onUnmounted(() => {
-  window.removeEventListener('quizlo-api-mode-changed', fetchStats)
-})
 </script>
 
 <style scoped>
