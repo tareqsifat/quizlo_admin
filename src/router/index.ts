@@ -67,7 +67,10 @@ const router = createRouter({
           component: () => import('../modules/activity/pages/ActivityLogsPage.vue')
         }
       ]
-    }
+    },
+    { path: '/dashboard', redirect: '/' },
+    // Unknown URLs used to render a blank page; send them to the dashboard (or login via the guard)
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
 

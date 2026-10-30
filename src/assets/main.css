@@ -107,7 +107,7 @@
 .p-button {
   background-color: var(--color-primary) !important;
   border-color: var(--color-primary) !important;
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Outfit', 'Noto Sans Bengali', sans-serif !important;
   font-weight: 500 !important;
   border-radius: var(--radius-md) !important;
   box-shadow: 0 4px 10px rgba(91, 79, 220, 0.15);

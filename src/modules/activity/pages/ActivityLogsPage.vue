@@ -2,7 +2,13 @@
   <div class="activity-page animate-fade">
     <div class="page-actions">
       <h3 class="section-title">Activity Logs</h3>
-      <Button icon="pi pi-refresh" label="Refresh" class="p-button-text p-button-sm" @click="fetchLogs" />
+      <div class="header-controls">
+        <label class="get-toggle" title="GET requests only read data, so they are not recorded unless this is on">
+          <ToggleSwitch v-model="includeGet" :disabled="savingSetting" @update:modelValue="saveIncludeGet" />
+          <span>Record GET requests</span>
+        </label>
+        <Button icon="pi pi-refresh" label="Refresh" class="p-button-text p-button-sm" @click="fetchLogs" />
+      </div>
     </div>
 
     <div class="filter-bar">
@@ -89,6 +95,7 @@ import Column from 'primevue/column'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
+import ToggleSwitch from 'primevue/toggleswitch'
 import apiClient from '../../../shared/services/apiClient'
 
 const logs = ref<any[]>([])
@@ -140,6 +147,31 @@ async function fetchAdmins() {
   }
 }
 
+const includeGet = ref(false)
+const savingSetting = ref(false)
+
+async function fetchSettings() {
+  try {
+    const res = await apiClient.get('/admin/activity-logs/settings')
+    if (res.success) includeGet.value = res.data.include_get
+  } catch (error) {
+    console.error('Error loading activity log settings:', error)
+  }
+}
+
+async function saveIncludeGet(value: boolean) {
+  savingSetting.value = true
+  try {
+    const res = await apiClient.put('/admin/activity-logs/settings', { include_get: value })
+    if (res.success) includeGet.value = res.data.include_get
+  } catch (error) {
+    includeGet.value = !value   // revert the switch if the save failed
+    console.error('Error saving activity log settings:', error)
+  } finally {
+    savingSetting.value = false
+  }
+}
+
 function resetAndFetch() {
   pagination.value.first = 0
   fetchLogs()
@@ -180,6 +212,7 @@ function statusClass(code: number) {
 }
 
 function loadAll() {
+  fetchSettings()
   fetchAdmins()
   fetchLogs()
 }
@@ -211,6 +244,21 @@ onUnmounted(() => {
 .section-title {
   font-size: 1.25rem;
   letter-spacing: -0.01em;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.get-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
 }
 
 .filter-bar {

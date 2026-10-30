@@ -1328,7 +1328,7 @@ async function runImport() {
 .bn-text {
   font-size: 0.775rem;
   color: var(--color-text-secondary);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', 'Noto Sans Bengali', sans-serif;
 }
 
 /* Type Badges */
