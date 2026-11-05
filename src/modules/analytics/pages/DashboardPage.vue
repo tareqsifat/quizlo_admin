@@ -92,7 +92,7 @@
         <div class="card-footer">
           <span class="footer-meta">
             <span class="review-accepted">Accepted: <strong>{{ stats.review.accepted }}</strong></span> |
-            <span class="review-rejected">Rejected: <strong>{{ stats.review.rejected }}</strong></span>
+            <router-link :to="{ name: 'questions', query: { review_status: 'rejected' } }" class="review-rejected review-link" title="Show rejected questions">Rejected: <strong>{{ stats.review.rejected }}</strong></router-link>
           </span>
         </div>
       </div>
@@ -237,6 +237,8 @@ onMounted(() => {
 
 .review-accepted strong { color: #27AE60; }
 .review-rejected strong { color: #E74C3C; }
+.review-link { color: inherit; text-decoration: none; }
+.review-link:hover strong { text-decoration: underline; }
 
 .icon {
   width: 22px;

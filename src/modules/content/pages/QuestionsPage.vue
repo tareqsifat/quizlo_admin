@@ -58,6 +58,10 @@
           <label>AI Verified</label>
           <Dropdown v-model="filters.verified_by_ai" :options="verifiedOptions" optionValue="value" optionLabel="label" placeholder="All" showClear class="dropdown-w" />
         </div>
+        <div class="filter-item">
+          <label>Human Review</label>
+          <Dropdown v-model="filters.review_status" :options="reviewStatusOptions" optionValue="value" optionLabel="label" placeholder="All" showClear class="dropdown-w" />
+        </div>
         <div class="drawer-actions">
           <Button label="Clear all" class="p-button-text" @click="clearAllFilters" />
           <Button label="Done" @click="filterDrawer = false" />
@@ -432,6 +436,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import * as XLSX from 'xlsx'
 import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
@@ -471,6 +476,13 @@ const typeOptions = [
   { label: 'Match Answer Pairs', value: 'match_answer' }
 ]
 
+type ReviewStatus = 'rejected' | 'accepted' | 'unchecked'
+const reviewStatusOptions: { label: string; value: ReviewStatus }[] = [
+  { label: 'Rejected', value: 'rejected' },
+  { label: 'Accepted', value: 'accepted' },
+  { label: 'Not reviewed', value: 'unchecked' }
+]
+
 const filterDrawer = ref(false)
 const filters = ref({
   exam_type_id: null as number | null,
@@ -481,6 +493,7 @@ const filters = ref({
   difficulty: null as string | null,
   year: null as number | 'none' | null,          // 'none' = questions with no known exam year
   verified_by_ai: null as 1 | 0 | null,
+  review_status: null as ReviewStatus | null,
   search: ''
 })
 
@@ -493,6 +506,14 @@ const topicTagOptions = [
   { label: 'Has a topic', value: 1 },
   { label: 'No topic yet', value: 0 }
 ]
+// Deep links preset the review filter, e.g. the dashboard's "Rejected" count
+// opens /questions?review_status=rejected so admins can work through them.
+const route = useRoute()
+const initialReviewStatus = route.query.review_status
+if (reviewStatusOptions.some(o => o.value === initialReviewStatus)) {
+  filters.value.review_status = initialReviewStatus as ReviewStatus
+}
+
 const verifiedOptions = [
   { label: 'Verified', value: 1 },
   { label: 'Not verified', value: 0 }
@@ -511,7 +532,7 @@ function onExamTypeFilterChange() {
   }
 }
 
-type FilterKey = 'exam_type_id' | 'exam_type_subject_id' | 'topic_id' | 'has_topic' | 'question_type' | 'difficulty' | 'year' | 'verified_by_ai'
+type FilterKey = 'exam_type_id' | 'exam_type_subject_id' | 'topic_id' | 'has_topic' | 'question_type' | 'difficulty' | 'year' | 'verified_by_ai' | 'review_status'
 
 // One removable tag per active drawer filter (search stays in the toolbar and has no tag)
 const activeFilterTags = computed(() => {
@@ -525,6 +546,7 @@ const activeFilterTags = computed(() => {
   if (f.difficulty !== null) tags.push({ key: 'difficulty', label: `Difficulty: ${f.difficulty}` })
   if (f.year !== null) tags.push({ key: 'year', label: f.year === 'none' ? 'Year: none' : `Year: ${f.year}` })
   if (f.verified_by_ai !== null) tags.push({ key: 'verified_by_ai', label: f.verified_by_ai ? 'AI verified' : 'Not AI verified' })
+  if (f.review_status !== null) tags.push({ key: 'review_status', label: `Review: ${reviewStatusOptions.find(o => o.value === f.review_status)?.label}` })
   return tags
 })
 const activeFilterCount = computed(() => activeFilterTags.value.length)
@@ -692,7 +714,7 @@ function onFormExamSubjectChange() {
 // Filters are applied server-side; any change goes back to page 1 (search is debounced while typing)
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 watch(() => [filters.value.exam_type_id, filters.value.exam_type_subject_id, filters.value.topic_id, filters.value.has_topic, filters.value.question_type, filters.value.difficulty,
-             filters.value.year, filters.value.verified_by_ai], () => {
+             filters.value.year, filters.value.verified_by_ai, filters.value.review_status], () => {
   pagination.value.first = 0
   fetchQuestions()
 })
